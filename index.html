@@ -900,12 +900,13 @@ const tc  = () => isLight ? '#4d6080' : '#7a8fad';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 /* ═══════════════════════════════════════════════
-   CONFIG — CHANGE THESE TWO VALUES
-   1. Paste your Apps Script deployment URL below
-   2. Set the same SECRET key you used in Apps Script
+   CONFIG
+   ▸ Only the deployment URL lives in the browser now.
+   ▸ The SECRET_KEY stays on the server (Apps Script) and is NEVER
+     shipped to the client — auth happens via short-lived login tokens
+     stored in sessionStorage.
 ═══════════════════════════════════════════════ */
-const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbwdUL1u-uc2ggSrBMPHYzURMWMB69XY7LbA9z62cSTHvFURAg1TTmD1BQkk1P3DvPq4/exec';
-const SHEET_API_KEY = 'X9aPq7LmT4zWv2Rb';
+const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbwTH-OrtU8UUozKGU5_36P0VJhfNGXfyK2sNIGrH--W-fHU1H3NBWv1GNt6_jLBBJZe/exec';
 
 /* ═══════════════════════════════════════════════
    SECURITY CONFIG
@@ -1063,10 +1064,9 @@ async function doLogin() {
     // ── Hash password before sending ──
     const hashed = await hashPwd(pwd);
 
-    // ── Verify with Apps Script ──
+    // ── Verify with Apps Script (no key — login is server rate-limited) ──
     const resp = await apiFetch({
       action: 'login',
-      key:    SHEET_API_KEY,
       email:  emailRaw,
       pwd:    hashed
     });
@@ -1237,14 +1237,15 @@ async function loadData(forceRefresh=false) {
       // forceRefresh=true when user clicks Refresh button — bypasses cache
       const refreshParam = forceRefresh ? '&refresh=1' : '';
       const token = getToken();
-      const url = SHEET_API_URL + '?key=' + encodeURIComponent(SHEET_API_KEY) + (token?'&token='+encodeURIComponent(token):'') + refreshParam;
+      if(!token) throw new Error('Session expired — please log in again');
+      const url = SHEET_API_URL + '?action=data&token=' + encodeURIComponent(token) + refreshParam;
       const res = await fetch(url, { redirect:'follow', mode:'cors' });
       if(!res.ok) throw new Error('Fetch failed: HTTP ' + res.status);
       const txt = await res.text();
       let json;
       try { json = JSON.parse(txt); }
       catch(pe) { throw new Error('Invalid JSON — check Apps Script deployment'); }
-      if(json.error === 'Unauthorized') throw new Error('Wrong secret key — check SHEET_API_KEY');
+      if(json.error === 'Unauthorized') { clearSession(); throw new Error('Session expired — please log in again'); }
       if(json.error) throw new Error('Apps Script: ' + json.error);
       if(!json.data || !Array.isArray(json.data)) throw new Error('No data array in response');
       rawData = parseJSON(json.data);
@@ -2329,7 +2330,7 @@ let _userList = [];
 async function renderUserTable(){
   g('uTableBody').innerHTML = '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--t3)">Loading…</td></tr>';
   try {
-    const resp = await apiFetch({ action:'listUsers', key:SHEET_API_KEY, token:getToken() });
+    const resp = await apiFetch({ action:'listUsers', token:getToken() });
     if(resp.error) { toast(resp.error,'err'); return; }
     _userList = resp.users || [];
     g('uTableBody').innerHTML = _userList.map((u,i) => `<tr>
@@ -2353,7 +2354,7 @@ async function changeRole(i, role){
   const user = _userList[i];
   if(!user) return;
   try {
-    const resp = await apiFetch({ action:'updateRole', key:SHEET_API_KEY, token:getToken(), email:user.email, role });
+    const resp = await apiFetch({ action:'updateRole', token:getToken(), email:user.email, role });
     if(resp.error) { toast(resp.error,'err'); return; }
     toast('Role updated for ' + user.email,'ok');
     renderUserTable();
@@ -2366,7 +2367,7 @@ async function deleteUser(i){
   if(user.email.toLowerCase() === CU.u.toLowerCase()){ toast('Cannot remove yourself','err'); return; }
   if(!confirm('Remove ' + user.email + '?')) return;
   try {
-    const resp = await apiFetch({ action:'removeUser', key:SHEET_API_KEY, token:getToken(), email:user.email });
+    const resp = await apiFetch({ action:'removeUser', token:getToken(), email:user.email });
     if(resp.error) { toast(resp.error,'err'); return; }
     toast('User removed','ok');
     renderUserTable();
@@ -2383,7 +2384,7 @@ async function addUser(){
   if(pwd.length<6){ toast('Password must be 6+ characters','err'); return; }
   const hashed = await hashPwd(pwd);
   try {
-    const resp = await apiFetch({ action:'addUser', key:SHEET_API_KEY, token:getToken(), email, name:name||email.split('@')[0], pwd:hashed, role });
+    const resp = await apiFetch({ action:'addUser', token:getToken(), email, name:name||email.split('@')[0], pwd:hashed, role });
     if(resp.error){ toast(resp.error,'err'); return; }
     g('newU').value=''; g('newName').value=''; g('newP').value='';
     toast('User added — they can now sign in','ok');
@@ -2727,8 +2728,8 @@ async function loadLtvData(){
   if(!isRealURL){ ltvData = []; return; }
   try {
     const token = getToken();
-    const url = SHEET_API_URL + '?action=ltv&key=' + encodeURIComponent(SHEET_API_KEY)
-              + (token ? '&token=' + encodeURIComponent(token) : '');
+    if(!token) throw new Error('Not logged in');
+    const url = SHEET_API_URL + '?action=ltv&token=' + encodeURIComponent(token);
     const res = await fetch(url, { redirect:'follow', mode:'cors' });
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const json = JSON.parse(await res.text());
