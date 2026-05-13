@@ -313,6 +313,74 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--t1);min-h
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--borderB);border-radius:3px}
+
+/* ── LTV TAB ── */
+.ltvBar{background:var(--card2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.ltvBar .lbLbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-right:4px}
+.ltvTypeToggle{display:inline-flex;background:var(--card);border:1px solid var(--border);border-radius:var(--rs);padding:2px;gap:2px}
+.ltvTypeToggle button{background:transparent;border:none;color:var(--t2);font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;padding:4px 12px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.ltvTypeToggle button.on{background:linear-gradient(135deg,var(--teal),var(--blue));color:#020d1a;box-shadow:0 2px 8px rgba(0,229,195,.18)}
+.ltvTypeToggle button:hover:not(.on){color:var(--t1);background:rgba(255,255,255,.04)}
+
+.ltvDayToggle{display:inline-flex;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2px;gap:2px;margin-left:auto}
+.ltvDayToggle button{background:transparent;border:none;color:var(--t2);font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;padding:4px 12px;border-radius:18px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.ltvDayToggle button.on{background:var(--tealD);color:var(--teal);border:1px solid rgba(0,229,195,.4)}
+.ltvDayToggle button:hover:not(.on){color:var(--t1)}
+
+/* LTV KPI strip — denser than dashboard KPIs (no spark) */
+.ltvKpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+.ltvKpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;animation:fadeUp .5s ease both}
+.ltvKpi:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.ltvKpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--lkc,var(--teal));z-index:1}
+.ltvKpi .kpiLbl{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t2);margin-bottom:8px}
+.ltvKpi .kpiVal{font-family:'DM Mono',monospace;font-size:clamp(15px,1.5vw,20px);font-weight:500;color:var(--lkc,var(--teal));line-height:1;margin-bottom:6px;white-space:nowrap}
+.ltvKpi .kpiSub{font-size:10px;color:var(--t3);font-weight:500;display:flex;align-items:center;gap:6px}
+.lkD7{--lkc:var(--blue)}.lkD14{--lkc:var(--amber)}.lkD30{--lkc:var(--teal)}.lkGr{--lkc:var(--green)}.lkCo{--lkc:var(--coral)}
+.ltvGrowth{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+.ltvGrowth.up{background:rgba(0,196,122,.1);color:var(--green)}
+.ltvGrowth.dn{background:rgba(255,77,109,.1);color:var(--coral)}
+@media(max-width:1100px){.ltvKpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.ltvKpis{grid-template-columns:1fr 1fr}}
+
+/* Cohort heatmap */
+.heatmapWrap{overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rs);background:var(--card2)}
+.heatmapTable{width:100%;border-collapse:separate;border-spacing:0;font-family:'DM Mono',monospace;font-size:11px}
+.heatmapTable thead th{position:sticky;top:0;background:var(--card);color:var(--t3);font-family:'Poppins',sans-serif;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);z-index:2;white-space:nowrap}
+.heatmapTable thead th:first-child,
+.heatmapTable thead th:nth-child(2){text-align:left;position:sticky;left:0;z-index:3}
+.heatmapTable thead th:first-child{left:0}
+.heatmapTable thead th:nth-child(2){left:130px}
+.heatmapTable tbody td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);color:var(--t1);white-space:nowrap;transition:background .12s}
+.heatmapTable tbody td:first-child,
+.heatmapTable tbody td:nth-child(2){text-align:left;font-family:'Poppins',sans-serif;color:var(--t2);position:sticky;background:var(--card2);font-weight:500}
+.heatmapTable tbody td:first-child{left:0;font-weight:600;color:var(--t1)}
+.heatmapTable tbody td:nth-child(2){left:130px;font-size:10px}
+.heatmapTable tbody tr:hover td{background:rgba(0,229,195,.04)}
+.heatmapTable tbody tr:hover td:first-child,
+.heatmapTable tbody tr:hover td:nth-child(2){background:rgba(0,229,195,.08)}
+.hmCell{position:relative}
+.hmCell .hmFill{position:absolute;inset:3px;border-radius:4px;background:var(--hmCol,transparent);opacity:var(--hmAlpha,0);z-index:0;pointer-events:none}
+.hmCell span{position:relative;z-index:1}
+
+/* LTV leaderboard */
+.ltvLead{width:100%;border-collapse:collapse;font-size:11px}
+.ltvLead th{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s}
+.ltvLead th:hover{color:var(--teal)}
+.ltvLead th.sorted{color:var(--teal)}
+.ltvLead th.numCol{text-align:right}
+.ltvLead td{padding:8px 10px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--t2);white-space:nowrap}
+.ltvLead td.gameName{font-family:'Poppins',sans-serif;color:var(--t1);font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.ltvLead td.numCol{text-align:right;color:var(--t1)}
+.ltvLead td.posGr{color:var(--green)}
+.ltvLead td.negGr{color:var(--coral)}
+.ltvLead tr:last-child td{border-bottom:none}
+.ltvLead tbody tr:hover td{background:var(--card2)}
+.ltvShowAll{margin-top:10px;background:transparent;border:1px solid var(--border);color:var(--t2);padding:6px 14px;border-radius:var(--rs);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'Poppins',sans-serif}
+.ltvShowAll:hover{border-color:var(--teal);color:var(--teal)}
+
+.ltvEmpty{padding:30px 20px;text-align:center;color:var(--t3);font-size:13px}
+.ltvLoading{padding:40px 20px;text-align:center;color:var(--t2);font-size:13px;display:flex;align-items:center;justify-content:center;gap:10px}
+.ltvLoading::before{content:'';display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite}
 </style>
 </head>
 <body>
@@ -381,6 +449,7 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--t1);min-h
     <div class="tabNav">
       <button class="tabBtn active" onclick="switchTab('dashboard',this)">Dashboard</button>
       <button class="tabBtn" onclick="switchTab('targets',this)">Targets</button>
+      <button class="tabBtn" onclick="switchTab('ltv',this)">LTV</button>
     </div>
     <div class="topRight">
       <div class="alertBadge" id="alertBadge" onclick="scrollToAlerts()">⚠ <span id="alertCount">0</span> Alerts</div>
@@ -749,6 +818,70 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--t1);min-h
       </div>
     </div>
   </div>
+
+  <!-- LTV TAB -->
+  <div class="tabPanel" id="tab-ltv">
+    <div class="main">
+      <!-- Filters -->
+      <div class="ltvBar">
+        <span class="lbLbl">LTV Type</span>
+        <div class="ltvTypeToggle" id="ltvTypeToggle">
+          <button class="on" data-ltv-type="Total LTV" onclick="setLtvType('Total LTV',this)">Total</button>
+          <button data-ltv-type="Ad LTV" onclick="setLtvType('Ad LTV',this)">Ad</button>
+          <button data-ltv-type="IAP LTV" onclick="setLtvType('IAP LTV',this)">IAP</button>
+        </div>
+        <span class="tsep" style="height:20px;margin:0 4px"></span>
+        <select class="fsel" id="ltvGame" onchange="renderLtv()"><option value="">🎮 All Games</option></select>
+        <select class="fsel" id="ltvPlat" onchange="renderLtv()"><option value="">📱 All Platforms</option></select>
+        <select class="fsel" id="ltvCountry" onchange="renderLtv()"><option value="">🌍 All Countries</option></select>
+        <span class="tsep" style="height:20px;margin:0 4px"></span>
+        <label style="font-size:11px;color:var(--t3);font-weight:500">From</label>
+        <input type="date" class="fsel" id="ltvFrom" onchange="renderLtv()"/>
+        <label style="font-size:11px;color:var(--t3);font-weight:500">To</label>
+        <input type="date" class="fsel" id="ltvTo" onchange="renderLtv()"/>
+        <button class="tbtn" onclick="resetLtvFilters()" style="margin-left:6px">↺ Reset</button>
+        <div class="ltvDayToggle">
+          <button class="on" data-ltv-range="standard" onclick="setLtvRange('standard',this)">Through D30</button>
+          <button data-ltv-range="extended" onclick="setLtvRange('extended',this)">Show D40–D50</button>
+        </div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="ltvKpis" id="ltvKpis">
+        <div class="ltvLoading" style="grid-column:1/-1">Loading LTV data…</div>
+      </div>
+
+      <!-- LTV curves chart -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="cardHead">
+          <span>LTV Cumulative Curves</span>
+          <span style="font-size:10px;font-weight:500;color:var(--t3);text-transform:none;letter-spacing:0">Avg LTV per install across all selected cohorts</span>
+        </div>
+        <div style="position:relative;height:340px"><canvas id="ltvCurveChart"></canvas></div>
+      </div>
+
+      <!-- Cohort heatmap -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="cardHead">
+          <span>Cohort Heatmap</span>
+          <span style="font-size:10px;font-weight:500;color:var(--t3);text-transform:none;letter-spacing:0">Each row = install date · cell color shows LTV intensity within column</span>
+        </div>
+        <div class="heatmapWrap" id="ltvHeatmapWrap">
+          <div class="ltvLoading">Loading heatmap…</div>
+        </div>
+      </div>
+
+      <!-- Game leaderboard -->
+      <div class="card">
+        <div class="cardHead">
+          <span>Game Leaderboard</span>
+          <span style="font-size:10px;font-weight:500;color:var(--t3);text-transform:none;letter-spacing:0">Sorted by D30 by default · click any column to re-sort</span>
+        </div>
+        <div style="overflow-x:auto"><table class="ltvLead" id="ltvLeadTable"></table></div>
+        <button class="ltvShowAll" id="ltvShowAllBtn" onclick="toggleLtvShowAll()" style="display:none">Show all</button>
+      </div>
+    </div>
+  </div>
 </div><!-- /app -->
 
 <script>
@@ -1076,6 +1209,7 @@ function switchTab(name, btn) {
   g('csvBtn').style.display  = isDash ? 'flex' : 'none';
   g('pdfBtn').style.display  = isDash ? 'flex' : 'none';
   if(name==='targets') buildTargetsUI();
+  if(name==='ltv')     buildLtvUI();
 }
 
 /* ═══════════════════════════════════════════════
@@ -2552,6 +2686,366 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
+/* ═══════════════════════════════════════════════
+   LTV TAB
+   ─ Data lives in a different spreadsheet, exposed via
+     same Apps Script as ?action=ltv (so auth + URL reuse).
+   ─ Each cohort row has 3 LTV types (Ad / IAP / Total).
+   ─ Default chart/table = D0..D30. Toggle reveals D40/D45/D50.
+═══════════════════════════════════════════════ */
+const LTV_DAYS_STD = ['D0','D1','D3','D7','D14','D21','D28','D30'];
+const LTV_DAYS_EXT = ['D0','D1','D3','D7','D14','D21','D28','D30','D40','D45','D50'];
+const LTV_KPI_DAYS = ['D7','D14','D30'];
+let   ltvData = null;       // raw rows from Apps Script
+let   ltvFilters = { type:'Total LTV', game:'', plat:'', country:'', from:'', to:'', range:'standard' };
+let   ltvLeadSort = { col:'D30', dir:'desc' };
+let   ltvShowAll  = false;
+let   _ltvLoaded  = false;
+
+// Parse "PS_Android_My Supermarket Simulator" -> { plat:'Android', game:'My Supermarket Simulator' }
+function parseAppName(s){
+  s = String(s || '').trim();
+  // Common shapes: PS_Android_..., PS_iOS_..., PS_IOS_...
+  const m = s.match(/^PS_(Android|iOS|IOS|ios|android)_(.*)$/i);
+  if(m) return { plat: m[1].toLowerCase()==='android' ? 'Android' : 'iOS', game: m[2].trim() };
+  return { plat: '', game: s };
+}
+
+async function buildLtvUI(){
+  // Lazy: fetch once per session, then re-render on filter change.
+  if(!_ltvLoaded){
+    await loadLtvData();
+    populateLtvDropdowns();
+    _ltvLoaded = true;
+  }
+  renderLtv();
+}
+
+async function loadLtvData(){
+  const isRealURL = SHEET_API_URL && SHEET_API_URL.includes('script.google.com') && SHEET_API_URL.includes('/exec');
+  if(!isRealURL){ ltvData = []; return; }
+  try {
+    const token = getToken();
+    const url = SHEET_API_URL + '?action=ltv&key=' + encodeURIComponent(SHEET_API_KEY)
+              + (token ? '&token=' + encodeURIComponent(token) : '');
+    const res = await fetch(url, { redirect:'follow', mode:'cors' });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const json = JSON.parse(await res.text());
+    if(json.error) throw new Error(json.error);
+    ltvData = (json.data || []).map(r => {
+      const ap = parseAppName(r.app);
+      return {
+        installDate: r.installDate,
+        app:        r.app,
+        game:       ap.game,
+        plat:       ap.plat,
+        country:    r.country,
+        cohortSize: +r.cohortSize || 0,
+        type:       r.type,
+        days:       r.days || {}
+      };
+    });
+  } catch(e){
+    ltvData = [];
+    toast('LTV fetch failed — ' + e.message, 'warn');
+  }
+}
+
+function populateLtvDropdowns(){
+  const games = new Set(), plats = new Set(), countries = new Set();
+  (ltvData||[]).forEach(r => {
+    if(r.game) games.add(r.game);
+    if(r.plat) plats.add(r.plat);
+    if(r.country) countries.add(r.country);
+  });
+  const fill = (id, set, prefix) => {
+    const el = g(id); if(!el) return;
+    el.innerHTML = `<option value="">${prefix}</option>` + [...set].sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+  };
+  fill('ltvGame',    games,     '🎮 All Games');
+  fill('ltvPlat',    plats,     '📱 All Platforms');
+  fill('ltvCountry', countries, '🌍 All Countries');
+}
+
+function setLtvType(type, btn){
+  ltvFilters.type = type;
+  document.querySelectorAll('#ltvTypeToggle button').forEach(b=>b.classList.toggle('on', b===btn));
+  renderLtv();
+}
+
+function setLtvRange(range, btn){
+  ltvFilters.range = range;
+  document.querySelectorAll('.ltvDayToggle button').forEach(b=>b.classList.toggle('on', b===btn));
+  renderLtv();
+}
+
+function resetLtvFilters(){
+  ltvFilters = { type:'Total LTV', game:'', plat:'', country:'', from:'', to:'', range:'standard' };
+  ['ltvGame','ltvPlat','ltvCountry','ltvFrom','ltvTo'].forEach(id=>{ const e=g(id); if(e) e.value=''; });
+  document.querySelectorAll('#ltvTypeToggle button').forEach(b=>b.classList.toggle('on', b.dataset.ltvType==='Total LTV'));
+  document.querySelectorAll('.ltvDayToggle button').forEach(b=>b.classList.toggle('on', b.dataset.ltvRange==='standard'));
+  renderLtv();
+}
+
+function getLtvFiltered(){
+  // Read inputs each time so manual select changes flow through.
+  ltvFilters.game    = v('ltvGame');
+  ltvFilters.plat    = v('ltvPlat');
+  ltvFilters.country = v('ltvCountry');
+  ltvFilters.from    = v('ltvFrom');
+  ltvFilters.to      = v('ltvTo');
+  return (ltvData||[]).filter(r=>{
+    if(r.type !== ltvFilters.type) return false;
+    if(ltvFilters.game    && r.game    !== ltvFilters.game)    return false;
+    if(ltvFilters.plat    && r.plat    !== ltvFilters.plat)    return false;
+    if(ltvFilters.country && r.country !== ltvFilters.country) return false;
+    if(ltvFilters.from && r.installDate && r.installDate < ltvFilters.from) return false;
+    if(ltvFilters.to   && r.installDate && r.installDate > ltvFilters.to)   return false;
+    return true;
+  });
+}
+
+function renderLtv(){
+  if(!_ltvLoaded){ return; } // not opened yet
+  const rows = getLtvFiltered();
+  if(!rows.length){
+    g('ltvKpis').innerHTML = '<div class="ltvEmpty" style="grid-column:1/-1">No LTV rows match the current filters.</div>';
+    g('ltvHeatmapWrap').innerHTML = '<div class="ltvEmpty">No data.</div>';
+    g('ltvLeadTable').innerHTML = '';
+    g('ltvShowAllBtn').style.display = 'none';
+    if(charts.ltvCurve){ charts.ltvCurve.destroy(); charts.ltvCurve = null; }
+    return;
+  }
+  renderLtvKpis(rows);
+  renderLtvCurve(rows);
+  renderLtvHeatmap(rows);
+  renderLtvLeaderboard(rows);
+}
+
+// Cohort-size weighted mean of a day across rows
+function ltvAvg(rows, day){
+  let num = 0, den = 0;
+  rows.forEach(r=>{
+    const val = r.days[day];
+    if(val == null || isNaN(val)) return;
+    const w = r.cohortSize || 1;
+    num += val * w; den += w;
+  });
+  return den > 0 ? num/den : 0;
+}
+
+function renderLtvKpis(rows){
+  const d7  = ltvAvg(rows, 'D7');
+  const d14 = ltvAvg(rows, 'D14');
+  const d30 = ltvAvg(rows, 'D30');
+  const cohortSum = rows.reduce((a,r)=>a+(r.cohortSize||0), 0);
+  // Growth: D7 -> D30
+  const growth = d7 > 0 ? ((d30 - d7) / d7 * 100) : 0;
+  const grCls  = growth >= 0 ? 'up' : 'dn';
+  const grSign = growth >= 0 ? '+' : '';
+  // D7 -> D14 sub-growth (shown under D14 tile)
+  const gr14   = d7 > 0 ? ((d14 - d7) / d7 * 100) : 0;
+  // D14 -> D30 sub-growth (shown under D30 tile)
+  const gr30   = d14 > 0 ? ((d30 - d14) / d14 * 100) : 0;
+  const fmtUSD = n => '$' + n.toFixed(n < 1 ? 4 : 2);
+
+  g('ltvKpis').innerHTML = ''
+    + kpiTile('lkD7',  'Avg D7 LTV',  fmtUSD(d7),  rows.length + ' cohorts')
+    + kpiTile('lkD14', 'Avg D14 LTV', fmtUSD(d14), gr14 ? `<span class="ltvGrowth ${gr14>=0?'up':'dn'}">${gr14>=0?'+':''}${gr14.toFixed(1)}% vs D7</span>` : '—')
+    + kpiTile('lkD30', 'Avg D30 LTV', fmtUSD(d30), gr30 ? `<span class="ltvGrowth ${gr30>=0?'up':'dn'}">${gr30>=0?'+':''}${gr30.toFixed(1)}% vs D14</span>` : '—')
+    + kpiTile('lkGr',  'Growth D7→D30', `${grSign}${growth.toFixed(1)}%`, `<span class="ltvGrowth ${grCls}">${grSign}${(d30-d7).toFixed(2)} added</span>`)
+    + kpiTile('lkCo',  'Total Installs', cohortSum.toLocaleString(), 'across ' + rows.length + ' cohorts');
+}
+function kpiTile(cls, label, val, sub){
+  return `<div class="ltvKpi ${cls}">
+    <div class="kpiLbl">${label}</div>
+    <div class="kpiVal">${val}</div>
+    <div class="kpiSub">${sub}</div>
+  </div>`;
+}
+
+function renderLtvCurve(rows){
+  const days = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
+  const dayNum = d => parseInt(d.replace('D',''), 10);
+  const labels = days.map(d => d.replace('D','Day '));
+  // Plot all 3 LTV types side-by-side regardless of selected type filter, so
+  // user can compare composition (Ad vs IAP vs Total). Selected type drives
+  // tables/KPIs only.
+  const allFiltered = (ltvData||[]).filter(r=>{
+    if(ltvFilters.game && r.game !== ltvFilters.game) return false;
+    if(ltvFilters.plat && r.plat !== ltvFilters.plat) return false;
+    if(ltvFilters.country && r.country !== ltvFilters.country) return false;
+    if(ltvFilters.from && r.installDate && r.installDate < ltvFilters.from) return false;
+    if(ltvFilters.to   && r.installDate && r.installDate > ltvFilters.to)   return false;
+    return true;
+  });
+  const byType = { 'Total LTV':[], 'Ad LTV':[], 'IAP LTV':[] };
+  allFiltered.forEach(r => { if(byType[r.type]) byType[r.type].push(r); });
+
+  const dataset = (label, color, type) => ({
+    label, data: days.map(d => +ltvAvg(byType[type], d).toFixed(4)),
+    borderColor: color,
+    backgroundColor: color.replace(')', ',.08)').replace('rgb','rgba'),
+    borderWidth: type === ltvFilters.type ? 2.6 : 1.6,
+    pointRadius: 3, pointHoverRadius: 5,
+    tension: .35, fill: type === ltvFilters.type
+  });
+
+  if(charts.ltvCurve) charts.ltvCurve.destroy();
+  charts.ltvCurve = new Chart(g('ltvCurveChart').getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        dataset('Total LTV', 'rgb(0,229,195)', 'Total LTV'),
+        dataset('Ad LTV',    'rgb(255,184,0)', 'Ad LTV'),
+        dataset('IAP LTV',   'rgb(77,159,255)','IAP LTV')
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{
+        legend:{ labels:{ color:tc(), font:{family:'Poppins',size:11}, boxWidth:11, padding:14 } },
+        tooltip:{
+          mode:'index', intersect:false,
+          callbacks:{
+            title: items => items[0].label,
+            label: ctx  => ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(4)}`
+          }
+        }
+      },
+      scales:{
+        x:{ ticks:{color:tc(), font:{size:10,family:'Poppins'}}, grid:{color:gc()} },
+        y:{ ticks:{color:tc(), font:{family:'DM Mono',size:10}, callback:v=>'$'+v.toFixed(2)}, grid:{color:gc()}, beginAtZero:true }
+      }
+    }
+  });
+}
+
+function renderLtvHeatmap(rows){
+  const days = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
+  // Aggregate per (installDate × app × country) — same row = one cohort entity
+  // Sort by installDate desc so latest cohorts are at top
+  const sorted = rows.slice().sort((a,b) => (b.installDate||'').localeCompare(a.installDate||''));
+
+  // Normalize each column independently so colors compare within a day.
+  const colMax = {};
+  days.forEach(d => {
+    let mx = 0;
+    sorted.forEach(r => { const v = r.days[d]; if(v != null && v > mx) mx = v; });
+    colMax[d] = mx || 1;
+  });
+
+  const head = '<thead><tr>'
+    + '<th>Install Date</th><th>Game · Country</th><th>Cohort</th>'
+    + days.map(d => `<th>${d}</th>`).join('')
+    + '</tr></thead>';
+
+  const body = '<tbody>' + sorted.map(r => {
+    const cells = days.map(d => {
+      const val = r.days[d];
+      if(val == null || isNaN(val)) return '<td>—</td>';
+      const a = Math.min(1, val / colMax[d]) * 0.55;
+      return `<td class="hmCell" style="--hmCol:rgba(0,229,195,1);--hmAlpha:${a.toFixed(3)}"><div class="hmFill"></div><span>$${val.toFixed(val<1?4:2)}</span></td>`;
+    }).join('');
+    const gameLabel = (r.game || r.app || '—') + (r.country ? ' · ' + r.country : '');
+    return `<tr>
+      <td>${r.installDate||'—'}</td>
+      <td title="${r.app}">${gameLabel}</td>
+      <td>${(r.cohortSize||0).toLocaleString()}</td>
+      ${cells}
+    </tr>`;
+  }).join('') + '</tbody>';
+
+  g('ltvHeatmapWrap').innerHTML = '<table class="heatmapTable">' + head + body + '</table>';
+}
+
+function renderLtvLeaderboard(rows){
+  const days = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
+  // Group by game + plat + country
+  const groups = {};
+  rows.forEach(r => {
+    const k = (r.game||r.app) + '|' + r.plat + '|' + r.country;
+    if(!groups[k]){
+      groups[k] = { game:r.game||r.app, plat:r.plat, country:r.country, cohortSize:0, days:{} };
+      days.forEach(d => groups[k].days[d] = { num:0, den:0 });
+    }
+    const w = r.cohortSize || 1;
+    groups[k].cohortSize += (r.cohortSize||0);
+    days.forEach(d => {
+      const v = r.days[d];
+      if(v != null && !isNaN(v)){
+        groups[k].days[d].num += v * w;
+        groups[k].days[d].den += w;
+      }
+    });
+  });
+  const list = Object.values(groups).map(gp => {
+    const out = { game:gp.game, plat:gp.plat, country:gp.country, cohortSize:gp.cohortSize };
+    days.forEach(d => { out[d] = gp.days[d].den > 0 ? gp.days[d].num/gp.days[d].den : 0; });
+    out.growth = out.D7 > 0 ? ((out.D30 - out.D7)/out.D7*100) : 0;
+    return out;
+  });
+
+  // Sort
+  const sortCol = ltvLeadSort.col, dir = ltvLeadSort.dir==='asc' ? 1 : -1;
+  list.sort((a,b) => ((a[sortCol]||0) - (b[sortCol]||0)) * dir
+    || (a.game||'').localeCompare(b.game||''));
+
+  // Header
+  const cols = ['game','plat','country','cohortSize', ...days, 'growth'];
+  const colLabels = { game:'Game', plat:'Platform', country:'Country', cohortSize:'Cohort', growth:'D7→D30' };
+  days.forEach(d => colLabels[d] = d);
+
+  const head = '<thead><tr>' + cols.map(c => {
+    const isNum = c === 'cohortSize' || c === 'growth' || days.indexOf(c) >= 0;
+    const sorted = c === sortCol ? ' sorted' : '';
+    const arrow  = c === sortCol ? (dir > 0 ? ' ▲' : ' ▼') : '';
+    return `<th class="${isNum?'numCol':''}${sorted}" onclick="setLtvLeadSort('${c}')">${colLabels[c]||c}${arrow}</th>`;
+  }).join('') + '</tr></thead>';
+
+  const visible = ltvShowAll ? list : list.slice(0, 10);
+  const fmt = n => '$' + (n<1?n.toFixed(4):n.toFixed(2));
+
+  const body = '<tbody>' + visible.map(r => {
+    return '<tr>'
+      + `<td class="gameName" title="${r.game||''}">${r.game||'—'}</td>`
+      + `<td>${r.plat||'—'}</td>`
+      + `<td>${r.country||'—'}</td>`
+      + `<td class="numCol">${(r.cohortSize||0).toLocaleString()}</td>`
+      + days.map(d => `<td class="numCol">${fmt(r[d]||0)}</td>`).join('')
+      + `<td class="numCol ${r.growth>=0?'posGr':'negGr'}">${r.growth>=0?'+':''}${r.growth.toFixed(1)}%</td>`
+      + '</tr>';
+  }).join('') + '</tbody>';
+
+  g('ltvLeadTable').innerHTML = head + body;
+  const showBtn = g('ltvShowAllBtn');
+  if(list.length > 10){
+    showBtn.style.display = 'inline-block';
+    showBtn.textContent = ltvShowAll ? 'Show top 10' : `Show all (${list.length})`;
+  } else {
+    showBtn.style.display = 'none';
+  }
+}
+function setLtvLeadSort(col){
+  if(ltvLeadSort.col === col){
+    ltvLeadSort.dir = ltvLeadSort.dir === 'asc' ? 'desc' : 'asc';
+  } else {
+    ltvLeadSort.col = col;
+    ltvLeadSort.dir = (col === 'game' || col === 'plat' || col === 'country') ? 'asc' : 'desc';
+  }
+  renderLtv();
+}
+function toggleLtvShowAll(){ ltvShowAll = !ltvShowAll; renderLtv(); }
+
+// Re-render LTV charts on theme toggle so colors stay accurate
+const _origToggleTheme = toggleTheme;
+toggleTheme = function(){
+  _origToggleTheme();
+  if(_ltvLoaded && g('tab-ltv').classList.contains('active')) renderLtv();
+};
 </script>
 </body>
 </html>
