@@ -2966,7 +2966,7 @@ function renderLtvKpis(rows){
   const gr14   = d7 > 0 ? ((d14 - d7) / d7 * 100) : 0;
   // D14 -> D30 sub-growth (shown under D30 tile)
   const gr30   = d14 > 0 ? ((d30 - d14) / d14 * 100) : 0;
-  const fmtUSD = n => '$' + n.toFixed(n < 1 ? 4 : 2);
+  const fmtUSD = n => '$' + n.toFixed(2);
 
   g('ltvKpis').innerHTML = ''
     + kpiTile('lkD7',  'Avg D7 LTV',  fmtUSD(d7),  rows.length + ' cohorts')
@@ -3010,7 +3010,7 @@ function renderLtvCurve(rows){
   allFiltered.forEach(r => { if(byType[r.type]) byType[r.type].push(r); });
 
   const dataset = (label, color, type) => ({
-    label, data: days.map(d => +ltvAvg(byType[type], d).toFixed(4)),
+    label, data: days.map(d => +ltvAvg(byType[type], d).toFixed(2)),
     borderColor: color,
     backgroundColor: color.replace(')', ',.08)').replace('rgb','rgba'),
     borderWidth: type === ltvFilters.type ? 2.6 : 1.6,
@@ -3038,7 +3038,7 @@ function renderLtvCurve(rows){
           mode:'index', intersect:false,
           callbacks:{
             title: items => items[0].label,
-            label: ctx  => ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(4)}`
+            label: ctx  => ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
           }
         }
       },
@@ -3117,7 +3117,7 @@ function renderLtvPerformance(){
 
   const valueFor = (type, b) => {
     const c = agg[type][b];
-    return c && c.den > 0 ? +(c.num / c.den).toFixed(4) : null;
+    return c && c.den > 0 ? +(c.num / c.den).toFixed(2) : null;
   };
 
   const fmtBucketLbl = b => {
@@ -3161,7 +3161,7 @@ function renderLtvPerformance(){
           mode:'index', intersect:false,
           callbacks:{
             title: items => `${ltvPerfDay} · ${items[0].label}`,
-            label: ctx  => ctx.parsed.y == null ? ` ${ctx.dataset.label}: —` : ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(4)}`
+            label: ctx  => ctx.parsed.y == null ? ` ${ctx.dataset.label}: —` : ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
           }
         }
       },
@@ -3175,10 +3175,51 @@ function renderLtvPerformance(){
 
 function renderLtvHeatmap(rows){
   const days = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-  // Aggregate per (installDate × app × country) — same row = one cohort entity
-  // Sort by installDate ascending → oldest cohorts at top, latest at bottom
-  // (matches normal time-series reading order)
-  const sorted = rows.slice().sort((a,b) => (a.installDate||'').localeCompare(b.installDate||''));
+
+  // Group by install date — when game/country aren't filtered (or even when
+  // they are, but multiple rows still match), collapse them into a single
+  // cohort-size weighted row per date. This makes the heatmap a clean
+  // time-series view; per-game breakdown lives in the Leaderboard below.
+  const byDate = {};
+  rows.forEach(r => {
+    const dt = r.installDate || '';
+    if(!dt) return;
+    if(!byDate[dt]) byDate[dt] = {
+      installDate: dt,
+      cohortSize:  0,
+      games:       new Set(),
+      countries:   new Set(),
+      sum:         {}    // sum[day] = { num, den } for weighted mean
+    };
+    const grp = byDate[dt];
+    grp.cohortSize += (r.cohortSize || 0);
+    if(r.game)    grp.games.add(r.game);
+    if(r.country) grp.countries.add(r.country);
+    const w = r.cohortSize || 1;
+    days.forEach(d => {
+      const v = r.days?.[d];
+      if(v == null || isNaN(v)) return;
+      if(!grp.sum[d]) grp.sum[d] = { num: 0, den: 0 };
+      grp.sum[d].num += v * w;
+      grp.sum[d].den += w;
+    });
+  });
+
+  const sorted = Object.values(byDate)
+    .map(g => {
+      const dayVals = {};
+      days.forEach(d => {
+        dayVals[d] = (g.sum[d] && g.sum[d].den > 0) ? g.sum[d].num / g.sum[d].den : null;
+      });
+      return {
+        installDate: g.installDate,
+        cohortSize:  g.cohortSize,
+        games:       [...g.games],
+        countries:   [...g.countries],
+        days:        dayVals
+      };
+    })
+    .sort((a,b) => (a.installDate||'').localeCompare(b.installDate||''));
 
   // Normalize each column independently so colors compare within a day.
   const colMax = {};
@@ -3188,8 +3229,15 @@ function renderLtvHeatmap(rows){
     colMax[d] = mx || 1;
   });
 
+  // Smart label: single name if only one in the group, otherwise count.
+  const labelOf = (arr, singularName, pluralName) => {
+    if(!arr.length)    return '—';
+    if(arr.length===1) return arr[0];
+    return arr.length + ' ' + (arr.length===1 ? singularName : pluralName);
+  };
+
   const head = '<thead><tr>'
-    + '<th>Install Date</th><th>Game · Country</th><th>Cohort</th>'
+    + '<th>Install Date</th><th>Coverage</th><th>Cohort</th>'
     + days.map(d => `<th>${d}</th>`).join('')
     + '</tr></thead>';
 
@@ -3198,12 +3246,19 @@ function renderLtvHeatmap(rows){
       const val = r.days[d];
       if(val == null || isNaN(val)) return '<td>—</td>';
       const a = Math.min(1, val / colMax[d]) * 0.55;
-      return `<td class="hmCell" style="--hmCol:rgba(0,229,195,1);--hmAlpha:${a.toFixed(3)}"><div class="hmFill"></div><span>$${val.toFixed(val<1?4:2)}</span></td>`;
+      return `<td class="hmCell" style="--hmCol:rgba(0,229,195,1);--hmAlpha:${a.toFixed(3)}"><div class="hmFill"></div><span>$${val.toFixed(2)}</span></td>`;
     }).join('');
-    const gameLabel = (r.game || r.app || '—') + (r.country ? ' · ' + r.country : '');
+
+    const gameLbl    = labelOf(r.games,     'game',    'games');
+    const countryLbl = labelOf(r.countries, 'country', 'countries');
+    // Tooltip shows the actual list when collapsed (helps debugging without clutter)
+    const tip = (r.games.length>1 || r.countries.length>1)
+      ? `${r.games.join(', ')}${r.countries.length ? ' — ' + r.countries.join(', ') : ''}`
+      : '';
+
     return `<tr>
       <td>${r.installDate||'—'}</td>
-      <td title="${r.app}">${gameLabel}</td>
+      <td${tip ? ' title="'+tip.replace(/"/g,'&quot;')+'"' : ''}>${gameLbl} · ${countryLbl}</td>
       <td>${(r.cohortSize||0).toLocaleString()}</td>
       ${cells}
     </tr>`;
@@ -3257,7 +3312,7 @@ function renderLtvLeaderboard(rows){
   }).join('') + '</tr></thead>';
 
   const visible = ltvShowAll ? list : list.slice(0, 10);
-  const fmt = n => '$' + (n<1?n.toFixed(4):n.toFixed(2));
+  const fmt = n => '$' + n.toFixed(2);
 
   const body = '<tbody>' + visible.map(r => {
     return '<tr>'
