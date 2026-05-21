@@ -856,6 +856,7 @@ body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--t1);min-h
         <label style="font-size:11px;color:var(--t3);font-weight:500">To</label>
         <input type="date" class="fsel" id="ltvTo" onchange="renderLtv()"/>
         <button class="tbtn" onclick="resetLtvFilters()" style="margin-left:6px">↺ Reset</button>
+        <button class="tbtn" onclick="reloadLtvData(this)" title="Re-pull LTV rows from the sheet (skips browser/Apps Script cache)">⟳ Refresh data</button>
         <div class="ltvDayToggle">
           <button class="on" data-ltv-range="standard" onclick="setLtvRange('standard',this)">Through D30</button>
           <button data-ltv-range="extended" onclick="setLtvRange('extended',this)">Show D40–D50</button>
@@ -946,7 +947,7 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
      shipped to the client — auth happens via short-lived login tokens
      stored in sessionStorage.
 ═══════════════════════════════════════════════ */
-const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxCjLA9EUPcWINARcKj2Iv7kBef9fCGHNC8nb-bBXT2_lmwEgrfXMelkbjLFhcTCcUa/exec';
+const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbwTH-OrtU8UUozKGU5_36P0VJhfNGXfyK2sNIGrH--W-fHU1H3NBWv1GNt6_jLBBJZe/exec';
 
 /* ═══════════════════════════════════════════════
    SECURITY CONFIG
@@ -1923,8 +1924,12 @@ function renderProjected(){
     else{badge.textContent='✗ Missed '+finalPct.toFixed(1)+'%';badge.className='projBadge projBehind';}
   } else if(exceeded){
     badge.textContent='🎉 Exceeded!';badge.className='projBadge projExceeded';
-  } else if(pct>=80){
+  } else if(pct>=100){
+    // Projected month-end >= target → genuinely on track
     badge.textContent='On Track';badge.className='projBadge projOntrack';
+  } else if(pct>=90){
+    // Projected to fall just short of target
+    badge.textContent='At Risk';badge.className='projBadge projBehind';
   } else {
     badge.textContent='Needs Attention';badge.className='projBadge projBehind';
   }
@@ -2785,14 +2790,33 @@ async function buildLtvUI(){
   renderLtv();
 }
 
+// Force a fresh pull from the sheet — used by the ⟳ Refresh button when the
+// user has just edited rows in the Google Sheet and the in-memory snapshot
+// is stale. Bypasses the _ltvLoaded gate, then re-renders.
+async function reloadLtvData(btn){
+  const orig = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '⟳ Refreshing…'; }
+  try {
+    await loadLtvData();
+    populateLtvDropdowns();
+    _ltvLoaded = true;
+    renderLtv();
+    if(btn){ btn.textContent = '✓ Refreshed'; setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 1200); }
+  } catch(e){
+    if(btn){ btn.textContent = '✕ Failed';   setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 1500); }
+  }
+}
+
 async function loadLtvData(){
   const isRealURL = SHEET_API_URL && SHEET_API_URL.includes('script.google.com') && SHEET_API_URL.includes('/exec');
   if(!isRealURL){ ltvData = []; return; }
   try {
     const token = getToken();
     if(!token) throw new Error('Not logged in');
-    const url = SHEET_API_URL + '?action=ltv&token=' + encodeURIComponent(token);
-    const res = await fetch(url, { redirect:'follow', mode:'cors' });
+    // Cache-buster (_cb) defeats Google's edge cache + browser HTTP cache —
+    // without it, newly added rows in the LTV sheet take 5–15 min to appear.
+    const url = SHEET_API_URL + '?action=ltv&token=' + encodeURIComponent(token) + '&_cb=' + Date.now();
+    const res = await fetch(url, { redirect:'follow', mode:'cors', cache:'no-store' });
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const json = JSON.parse(await res.text());
     if(json.error) throw new Error(json.error);
