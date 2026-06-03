@@ -2010,6 +2010,22 @@ function expSmoothingProjection(dailyProfits){
   return smoothed;
 }
 
+// Daily-profit series for the most recent 14 days of data (yesterday-based cap).
+// This drives the "smart daily" run-rate for ALL projections — a rolling 14-day
+// window is steadier than using only the current calendar month (which can be
+// just 1–2 days early in a month). Returns oldest→newest so exp-smoothing
+// weights the most recent days highest.
+function last14DailyProfits(){
+  const yd=new Date(); yd.setDate(yd.getDate()-1); yd.setHours(0,0,0,0);
+  const ydStr=isoDate(yd);
+  const cap=(window._dataLastDate && window._dataLastDate<ydStr) ? window._dataLastDate : ydStr;
+  const from=new Date(cap+'T00:00:00'); from.setDate(from.getDate()-13); // 14-day inclusive
+  const fromStr=isoDate(from);
+  const byDate={};
+  rawData.forEach(r=>{ if(r.date && r.date>=fromStr && r.date<=cap){ byDate[r.date]=(byDate[r.date]||0)+r.profit; } });
+  return Object.keys(byDate).sort().map(d=>byDate[d]);
+}
+
 function renderProjected(){
   buildMonthFilter();
 
@@ -2037,8 +2053,10 @@ function renderProjected(){
   const dim=new Date(pymYr,pymMo,0).getDate(); // days in month
   const elapsed=sortedDates.length; // actual days with data
 
-  // Smart projection using exponential smoothing
-  const smartDailyAvg=expSmoothingProjection(dailyProfits);
+  // Smart projection run-rate: exp-smoothing over the LAST 14 DAYS of data
+  // (rolling window) rather than only this month's days — steadier projection.
+  const series14=last14DailyProfits();
+  const smartDailyAvg=expSmoothingProjection(series14);
   const simpleDailyAvg=elapsed>0?curProfit/elapsed:0;
   const daysLeft=dim-elapsed;
   // A month is COMPLETE/past when our latest data day (yesterday) is on/after its
@@ -2120,7 +2138,7 @@ function renderProjected(){
   const noteEl=g('projMethodNote');
   if(noteEl){
     if(isCurrentMonth&&elapsed>0){
-      noteEl.textContent=`⚡ EXP smoothing (α=0.35) on ${elapsed} days data — recent days weighted higher`;
+      noteEl.textContent=`⚡ EXP smoothing (α=0.35) on last ${series14.length} days — recent days weighted higher`;
     } else if(!isCurrentMonth){
       noteEl.textContent=elapsed>=dim?`✓ Month complete — actual: ${fmFull(curProfit)}`:`${elapsed} of ${dim} days recorded`;
     }
@@ -2200,10 +2218,9 @@ function renderMonthly(){
     if(!daysInMonth[ym])daysInMonth[ym]=new Set();
     daysInMonth[ym].add(r.date);
   });
-  // Current month's smart daily avg — drives current & future month projections
-  const curByDate={};
-  rawData.forEach(r=>{ if((r.date||'').slice(0,7)===todayYm){ curByDate[r.date]=(curByDate[r.date]||0)+r.profit; } });
-  const smartDaily=expSmoothingProjection(Object.keys(curByDate).sort().map(dt=>curByDate[dt]));
+  // Smart daily avg — drives current & future month projections. Based on the
+  // LAST 14 DAYS of data (rolling window), not just the current month's days.
+  const smartDaily=expSmoothingProjection(last14DailyProfits());
 
   const rows=MONTHS.map((mn,i)=>{
     const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
