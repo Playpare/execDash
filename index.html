@@ -1116,6 +1116,37 @@ function loadTargets() {
 let TARGETS = loadTargets();
 const saveTargetsStore = () => localStorage.setItem('ed_targets', JSON.stringify(TARGETS));
 
+/* ── SHARED TARGETS (server) ───────────────────────────────────────────
+   Targets used to live only in this browser's localStorage, so they were
+   invisible on other people's machines. These two helpers sync them through
+   the Apps Script backend so every user sees the SAME goals. They fail soft:
+   if the backend / network is unavailable, we keep using the local copy.
+
+   Matches the backend contract (doGet, no doPost):
+   ▸ getTargets  → returns { targets: "<JSON string>" | null }
+   ▸ saveTargets → GET with &targets=<encoded JSON>, returns { success:true }
+                   (admin-only, enforced server-side via the login token)
+──────────────────────────────────────────────────────────────────────── */
+async function fetchTargetsFromServer(){
+  try{
+    const token = getToken(); if(!token) return null;
+    // _cb busts the browser cache so a freshly-saved set shows up immediately.
+    const json = await apiFetch({ action:'getTargets', token, _cb: Date.now() });
+    if(!json || json.error) return null;
+    let t = json.targets;                       // backend sends it as a JSON STRING
+    if(typeof t === 'string'){ try{ t = JSON.parse(t); }catch(e){ return null; } }
+    return (t && typeof t === 'object' && t.months) ? t : null;
+  }catch(e){ return null; }
+}
+
+async function saveTargetsToServer(){
+  try{
+    const token = getToken(); if(!token) return false;
+    const json = await apiFetch({ action:'saveTargets', token, targets: JSON.stringify(TARGETS) });
+    return !!(json && (json.success || json.ok) && !json.error);
+  }catch(e){ return false; }
+}
+
 // Compute quarter/annual from monthly targets
 function computeAutoTargets() {
   const yr = TARGETS.year || CY;
@@ -1404,6 +1435,9 @@ async function loadData(forceRefresh=false) {
     // Compute last available date from sheet data
     const allDates = rawData.map(r=>r.date).filter(Boolean).sort();
     window._dataLastDate = allDates[allDates.length-1] || '';
+    // Sync SHARED targets from the server so every user sees the same goals
+    // (no-op fallback to the local copy if the backend doesn't support it yet).
+    try { const srvT = await fetchTargetsFromServer(); if(srvT){ TARGETS = srvT; saveTargetsStore(); } } catch(e){}
     applyPresetDates(currentPreset);
     const _cs = window._fromCache ? ' ⚡ cached' : ' ✓ fresh';
     toast('Data loaded' + _cs + ' — ' + (window._dataLastDate||''), 'ok');
@@ -2493,9 +2527,18 @@ function saveTargets(){
   });
   saveTargetsStore();
   g('savedInfo').textContent='✓ Saved at '+new Date().toLocaleTimeString();
-  toast('Targets saved!','ok');
   if(rawData.length) renderAll();
   updateTargetPreview();
+  // Push to the server so the change is visible to all users (not just this PC).
+  saveTargetsToServer().then(ok=>{
+    if(ok){
+      toast('Targets saved & synced to all users','ok');
+      g('savedInfo').textContent='✓ Saved & synced to all users at '+new Date().toLocaleTimeString();
+    } else {
+      toast('Saved on this device — server sync unavailable','warn');
+      g('savedInfo').textContent='⚠ Saved locally only (server sync not set up) — '+new Date().toLocaleTimeString();
+    }
+  });
 }
 
 /* BULK MODAL */
