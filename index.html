@@ -5,14 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src * data: blob:;">
 <title>Executive Dashboard</title>
+<!-- favicon: set at runtime from the embedded PlaySpare cube logo (see setFavicon) -->
+<link rel="icon" type="image/png" id="faviconLink"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Quicksand:wght@500;600;700&family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 :root{
-  --bg:#070c18;--bg2:#0b1220;--card:#101826;--card2:#0d1a2a;
-  --glass:rgba(13,22,38,.88);--border:rgba(255,255,255,.065);--borderB:rgba(255,255,255,.12);
+  --bg:#000000;--bg2:#080a0e;--card:#0b0c0f;--card2:#070809;
+  --glass:rgba(9,10,13,.9);--border:rgba(255,255,255,.08);--borderB:rgba(255,255,255,.14);
   --t1:#edf2ff;--t2:#7a8fad;--t3:#3d5070;
   --teal:#00e5c3;--tealD:rgba(0,229,195,.14);
   --blue:#4d9fff;--blueD:rgba(77,159,255,.14);
@@ -24,10 +26,15 @@
   --sh:0 8px 40px rgba(0,0,0,.6);--shs:0 3px 16px rgba(0,0,0,.4);
 }
 .lt{
-  --bg:#f0f4fc;--bg2:#e4ecf8;--card:#fff;--card2:#f4f8ff;
-  --glass:rgba(255,255,255,.92);--border:rgba(0,0,0,.07);--borderB:rgba(0,0,0,.13);
-  --t1:#0c1829;--t2:#4d6080;--t3:#98afc8;
-  --sh:0 8px 40px rgba(0,0,0,.1);--shs:0 3px 16px rgba(0,0,0,.07);
+  /* Refined light theme: cool-neutral canvas, crisp white cards, soft layered
+     blue-grey shadows for depth, and a slightly deeper teal so accents read
+     well on white. */
+  --bg:#eef1f7;--bg2:#e3e8f2;--card:#ffffff;--card2:#f5f7fc;
+  --glass:rgba(255,255,255,.82);--border:rgba(15,30,60,.09);--borderB:rgba(15,30,60,.16);
+  --t1:#0d1b2e;--t2:#56657f;--t3:#94a3ba;
+  --teal:#00b39a;--tealD:rgba(0,179,154,.12);
+  --blueD:rgba(77,159,255,.12);
+  --sh:0 10px 34px rgba(30,50,90,.12);--shs:0 2px 10px rgba(30,50,90,.07);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;transition:background .3s,color .3s;overflow-x:hidden;-webkit-text-size-adjust:100%}
@@ -220,7 +227,9 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
 .barTrack{height:10px;background:var(--border);border-radius:99px;overflow:visible;position:relative}
 .barFill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--blue));transition:width 1.4s cubic-bezier(.4,0,.2,1);position:relative}
 .barMarker{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--amber);border-radius:99px}
-.barMarkerLabel{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--amber);white-space:nowrap}
+/* Target sits at the far-right (left:100%); anchor its label's RIGHT edge to the
+   marker so the value stays inside the card instead of overflowing off-screen. */
+.barMarkerLabel{position:absolute;top:-18px;right:0;left:auto;transform:none;font-size:9px;font-weight:700;color:var(--amber);white-space:nowrap}
 .barPct{font-size:12px;font-weight:700;color:var(--t2);margin-top:5px;text-align:right}
 .metGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
 .metItem{background:var(--card2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px}
@@ -897,10 +906,11 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
     <div class="main">
       <!-- Filters -->
       <div class="ltvBar">
-        <!-- Platform is now a tab toggle (populated from data), not a dropdown -->
+        <!-- Platform tabs: Android / iOS only (no "All") -->
         <span class="lbLbl">Platform</span>
         <div class="ltvTypeToggle" id="ltvPlatToggle">
-          <button class="on" data-ltv-plat="" onclick="setLtvPlat('',this)">All</button>
+          <button class="on" data-ltv-plat="Android" onclick="setLtvPlat('Android',this)">Android</button>
+          <button data-ltv-plat="iOS" onclick="setLtvPlat('iOS',this)">iOS</button>
         </div>
         <span class="tsep" style="height:20px;margin:0 4px"></span>
         <span class="lbLbl">LTV Type</span>
@@ -914,17 +924,17 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
         <select class="fsel" id="ltvGame" onchange="onLtvGameChange()"></select>
         <select class="fsel" id="ltvCountry" onchange="renderLtv()"><option value="">🌍 All Countries</option></select>
         <span class="tsep" style="height:20px;margin:0 4px"></span>
-        <!-- Install-date range presets — default to 45d so mature D30 cohorts are included -->
+        <!-- Install-date range presets — default to 90d -->
         <span class="lbLbl">Range</span>
         <div class="ltvTypeToggle" id="ltvDateToggle">
           <button data-ltv-days="7" onclick="setLtvDateRange(7)">Last 7d</button>
           <button data-ltv-days="28" onclick="setLtvDateRange(28)">Last 28d</button>
-          <button class="on" data-ltv-days="45" onclick="setLtvDateRange(45)">Last 45d</button>
+          <button data-ltv-days="45" onclick="setLtvDateRange(45)">Last 45d</button>
+          <button class="on" data-ltv-days="90" onclick="setLtvDateRange(90)">Last 90d</button>
           <button data-ltv-days="0" onclick="setLtvDateRange(0)">All</button>
         </div>
         <input type="date" class="fsel" id="ltvFrom" onchange="onLtvDateInput()" title="Custom from (install date)"/>
         <input type="date" class="fsel" id="ltvTo" onchange="onLtvDateInput()" title="Custom to (install date)"/>
-        <button class="tbtn" onclick="resetLtvFilters()" style="margin-left:6px">↺ Reset</button>
         <div class="ltvDayToggle">
           <button class="on" data-ltv-range="standard" onclick="setLtvRange('standard',this)">Through D30</button>
           <button data-ltv-range="extended" onclick="setLtvRange('extended',this)">Show D40–D50</button>
@@ -2314,7 +2324,20 @@ function renderTargetChart(){
 /* ═══════════════════════════════════════════════
    ALERTS (current month, per-game threshold)
 ═══════════════════════════════════════════════ */
+// ┌─────────────────────────────────────────────────────────────┐
+// │  ALERT SYSTEM TOGGLE                                          │
+// │  Set to  true  to turn the ROI alert badge + banner back on. │
+// └─────────────────────────────────────────────────────────────┘
+const ALERTS_ENABLED = false;
+
 function renderAlerts(){
+  // When disabled, make sure the topbar badge + banner are hidden, then stop.
+  if(!ALERTS_ENABLED){
+    const p=g('alertPanel'), b=g('alertBadge');
+    if(p) p.classList.remove('show');
+    if(b) b.classList.remove('show');
+    return;
+  }
   // current DATA month (yesterday-based — data is a day behind, so on 1 Jun we
   // still alert on May's games, not the empty June)
   const _ad=dataNow();
@@ -2619,9 +2642,9 @@ function renderGameBar(){
     if(r.platform) byGame[r.game].plats.add(r.platform);
   });
   const games=Object.values(byGame).sort((a,b)=>b.rev-a.rev);
-  // Core games (Supermarket / Dino / Hero) always show individually; EVERY other
-  // title rolls into the combined "Legacy Portfolio" (expandable to list them all).
-  const CORE_RX=/supermarket|dino|hero/i;
+  // Only Supermarket shows individually; EVERY other title (Dino, Hero, etc.)
+  // rolls into the combined "Legacy Portfolio" (expandable to list them all).
+  const CORE_RX=/supermarket/i;
   const top=games.filter(gm=>CORE_RX.test(gm.game));
   const rest=games.filter(gm=>!CORE_RX.test(gm.game));
   const legacy=rest.reduce((a,gm)=>({rev:a.rev+gm.rev,pro:a.pro+gm.pro}),{rev:0,pro:0});
@@ -2642,67 +2665,68 @@ function renderGameBar(){
 }
 
 function renderROIRanking(){
-  // Group by game + platform combination
-  const byKey={};
+  // Combine platforms per game (mirror the Revenue & Profit card): Supermarket
+  // shows on its own; every other title rolls into a combined "Legacy Portfolio"
+  // row whose ROI = pooled revenue / pooled spend, expandable to list each game.
+  const byGame={};
   getGameData().forEach(r=>{
-    const key=r.game+'|||'+r.platform;
-    if(!byKey[key])byKey[key]={game:r.game,platform:r.platform,rev:0,spd:0,pro:0};
-    byKey[key].rev+=r.revenue; byKey[key].spd+=r.spend; byKey[key].pro+=r.profit;
+    if(!byGame[r.game]) byGame[r.game]={game:r.game,rev:0,spd:0,pro:0,plats:new Set()};
+    byGame[r.game].rev+=r.revenue; byGame[r.game].spd+=r.spend; byGame[r.game].pro+=r.profit;
+    if(r.platform) byGame[r.game].plats.add(r.platform);
   });
   const defaultThr=TARGETS.roiAlert||1.20;
+  const CORE_RX=/supermarket/i;
 
-  // Platform badge style
-  const platStyle={
-    'Android':['rgba(61,220,132,.15)','#3ddc84'],
-    'iOS':    ['rgba(0,122,255,.15)', '#007aff'],
-    'Amazon': ['rgba(255,153,0,.15)', '#ff9900'],
-  };
-  function platBadge(p){
-    const [bg,col]=platStyle[p]||['rgba(255,255,255,.1)','#7a8fad'];
-    return `<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:${bg};color:${col};letter-spacing:.04em">${p}</span>`;
-  }
+  const tagPill=txt=>txt?`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:rgba(255,255,255,.08);color:var(--t3);letter-spacing:.04em">${txt}</span>`:'';
+  const platTag=g=>tagPill(g.plats.size>1?'COMBINED':(g.plats.size===1?[...g.plats][0]:''));
 
-  const items=Object.values(byKey)
-    .filter(d=>d.spd>0)
-    .map(d=>{
-      const roi=+(d.rev/d.spd).toFixed(2);
-      const thr=TARGETS.gameRoi?.[d.game]||defaultThr;
-      return{...d,roi,thr};
-    })
-    .sort((a,b)=>b.roi-a.roi);
+  const all=Object.values(byGame).filter(g=>g.spd>0).map(g=>{
+    const roi=+(g.rev/g.spd).toFixed(2);
+    const thr=TARGETS.gameRoi?.[g.game]||defaultThr;
+    return {...g, roi, thr};
+  });
+  const core=all.filter(g=>CORE_RX.test(g.game)).sort((a,b)=>b.roi-a.roi);
+  const legacyGames=all.filter(g=>!CORE_RX.test(g.game)).sort((a,b)=>b.roi-a.roi);
 
-  const maxRoi=items[0]?.roi||1;
+  // Combined legacy aggregate → single pooled ROI
+  const legAgg=legacyGames.reduce((a,g)=>({rev:a.rev+g.rev,spd:a.spd+g.spd}),{rev:0,spd:0});
+  const legRoi=legAgg.spd>0?+(legAgg.rev/legAgg.spd).toFixed(2):null;
 
-  // Match the Revenue card: show the top N, roll the rest behind an expand
-  // toggle instead of an inner scrollbar.
-  const ROI_TOP=5;
-  const rowHTML=(d,i)=>`
-    <tr class="${i>=ROI_TOP?'roiExtra':''}" style="border-bottom:1px solid var(--border)${i>=ROI_TOP&&!roiRankExpanded?';display:none':''}">
-      <td style="padding:7px 6px;font-size:11px;color:var(--t3);font-family:'DM Mono',monospace;width:22px;vertical-align:middle">${i+1}</td>
+  const maxRoi=Math.max(...core.map(g=>g.roi), legRoi||0, 1);
+
+  const row=(name, tagHtml, roi, thr, rank, sub)=>`
+    <tr style="border-bottom:1px solid var(--border)${sub&&!roiRankExpanded?';display:none':''}">
+      <td style="padding:7px 6px;font-size:11px;color:var(--t3);font-family:'DM Mono',monospace;width:22px;vertical-align:middle">${rank}</td>
       <td style="padding:7px 6px;vertical-align:middle">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <span style="font-size:12px;font-weight:600;color:var(--t1)">${d.game}</span>
-          ${platBadge(d.platform)}
+          <span style="font-size:12px;font-weight:${sub?500:600};color:var(--${sub?'t2':'t1'})">${name}</span>
+          ${tagHtml}
         </div>
         <div style="flex:1;height:4px;background:var(--border);border-radius:99px;overflow:hidden">
-          <div style="height:100%;border-radius:99px;width:${Math.min((d.roi/maxRoi*100),100).toFixed(0)}%;background:${d.roi>=d.thr?'var(--teal)':'var(--coral)'}"></div>
+          <div style="height:100%;border-radius:99px;width:${roi!==null?Math.min((roi/maxRoi*100),100).toFixed(0):0}%;background:${roi!==null&&roi>=thr?'var(--teal)':'var(--coral)'}"></div>
         </div>
       </td>
       <td style="padding:7px 6px;text-align:right;vertical-align:middle;white-space:nowrap">
-        <span class="pill ${d.roi>=d.thr?'pillG':'pillR'}">${fr2(d.roi)}</span>
-        <div style="font-size:9px;color:var(--t3);margin-top:2px">thr: ${fr2(d.thr)}</div>
+        <span class="pill ${roi!==null&&roi>=thr?'pillG':'pillR'}">${roi!==null?fr2(roi):'—'}</span>
+        <div style="font-size:9px;color:var(--t3);margin-top:2px">thr: ${fr2(thr)}</div>
       </td>
     </tr>`;
-  g('roiRankTable').innerHTML=items.map(rowHTML).join('') ||
+
+  let html='', rank=1;
+  core.forEach(g=>{ html+=row(g.game, platTag(g), g.roi, g.thr, rank++, false); });
+  if(legacyGames.length){
+    html+=row('Legacy Portfolio', tagPill(`${legacyGames.length} titles`), legRoi, defaultThr, rank++, false);
+    legacyGames.forEach(g=>{ html+=row(g.game, platTag(g), g.roi, g.thr, '·', true); });
+  }
+  g('roiRankTable').innerHTML = html ||
     `<tr><td style="padding:24px;text-align:center;color:var(--t3);font-size:12px">No ROI data</td></tr>`;
 
-  // Expand button: only when there are more than ROI_TOP rows.
-  const extra=items.length-ROI_TOP;
+  // Expand button toggles the legacy sub-rows (mirrors the Revenue card).
   const btn=g('roiExpandBtn');
   if(btn){
-    if(extra>0){
+    if(legacyGames.length){
       btn.style.display='block';
-      btn.textContent=roiRankExpanded?'▴ Collapse':`▾ Show ${extra} more`;
+      btn.textContent=`${roiRankExpanded?'▴ Collapse':'▾ Expand'} Legacy Portfolio (${legacyGames.length} titles)`;
     } else {
       btn.style.display='none';
     }
@@ -2882,7 +2906,16 @@ function toast(msg,type='ok'){
 function fmtLbl(d){if(!d)return'';const dt=new Date(d+'T00:00:00');return isNaN(dt)?d:dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});}
 
 // Auto-login on page load (login paused for development)
+// Reuse the embedded PlaySpare cube (topbar/loader) as the browser-tab favicon —
+// keeps the file self-contained, no extra image request.
+function setFavicon(){
+  const cube = document.querySelector('.brandCube') || document.querySelector('.loaderLogo');
+  const link = g('faviconLink');
+  if(cube && cube.src && link) link.href = cube.src;
+}
+
 window.addEventListener('DOMContentLoaded', () => {
+  setFavicon();
   if(!checkSession()) {
     g('loginScreen').style.display = 'flex';
     // Warn if opened as file://
@@ -2906,9 +2939,17 @@ const LTV_KPI_DAYS = ['D7','D14','D30'];
 // optional — user toggles them via the chip row). Key milestones default on.
 const LTV_DAYS_DEFAULT_VISIBLE = ['D0','D7','D14','D30'];
 let   ltvData = null;       // raw rows from Apps Script
-let   ltvFilters = { type:'Total LTV', game:'', plat:'', country:'', from:'', to:'', range:'standard', rangeDays:45 };
+
+// ┌──────────────────────────────────────────────────────────────────┐
+// │  LTV GAME FILTER TOGGLE                                            │
+// │  Set to  true  to bring back the per-game dropdown in the LTV bar. │
+// │  (Off = all games blended together, no game selector shown.)       │
+// └──────────────────────────────────────────────────────────────────┘
+const LTV_SHOW_GAME = false;
+
+let   ltvFilters = { type:'Total LTV', game:'', plat:'Android', country:'', from:'', to:'', range:'standard', rangeDays:90 };
 let   ltvVisibleDays = new Set(LTV_DAYS_DEFAULT_VISIBLE);
-let   ltvPerfDay = 'D7';     // selected day for Performance Trends
+let   ltvPerfDay = 'D28';    // selected day for Performance Trends
 let   ltvPerfPeriod = 'daily';
 let   ltvLeadSort = { col:'D30', dir:'desc' };
 let   ltvShowAll  = false;
@@ -2937,7 +2978,7 @@ async function buildLtvUI(){
     await loadLtvData();
     populateLtvDropdowns();
     _ltvLoaded = true;
-    setLtvDateRange(45); // seed default install-date window (45d) + first render
+    setLtvDateRange(90); // seed default install-date window (90d) + first render
     return;
   }
   renderLtv();
@@ -3002,27 +3043,33 @@ function populateLtvDropdowns(){
     if(r.country && !isAllCountry(r.country)) countries.add(r.country);
   });
 
-  // Game: NO "All" option — game-wise only. Keep current pick if still valid,
-  // else default to the first game (e.g. the single game we have today).
+  // Game selector — disabled for now (LTV_SHOW_GAME). When off we hide the
+  // dropdown and don't filter by game (all games blended). Flip the flag to
+  // bring it back as a game-wise dropdown.
   const gameList = [...games].sort();
   const gEl = g('ltvGame');
   if(gEl){
-    const cur = gEl.value;
-    gEl.innerHTML = gameList.map(v=>`<option value="${v}">🎮 ${v}</option>`).join('');
-    gEl.value = gameList.includes(cur) ? cur : (gameList[0] || '');
-    ltvFilters.game = gEl.value;
+    if(LTV_SHOW_GAME){
+      gEl.style.display = '';
+      const cur = gEl.value;
+      gEl.innerHTML = gameList.map(v=>`<option value="${v}">🎮 ${v}</option>`).join('');
+      gEl.value = gameList.includes(cur) ? cur : (gameList[0] || '');
+      ltvFilters.game = gEl.value;
+    } else {
+      gEl.style.display = 'none';
+      gEl.innerHTML = '';
+      ltvFilters.game = '';
+    }
   }
 
-  // Platform: tab toggle (All + each platform), like the LTV Type tabs.
-  const platList = [...plats].sort();
+  // Platform tabs — Android / iOS only, no "All". Default to whichever has data
+  // (Android preferred); the buttons themselves are fixed in the markup.
   const pEl = g('ltvPlatToggle');
   if(pEl){
-    const cur = platList.includes(ltvFilters.plat) ? ltvFilters.plat : '';
+    let cur = ltvFilters.plat;
+    if(cur!=='Android' && cur!=='iOS') cur = plats.has('Android') ? 'Android' : (plats.has('iOS') ? 'iOS' : 'Android');
     ltvFilters.plat = cur;
-    const tabs = [{v:'',lbl:'All'}].concat(platList.map(p=>({v:p,lbl:p})));
-    pEl.innerHTML = tabs.map(t=>
-      `<button class="${t.v===cur?'on':''}" data-ltv-plat="${t.v}" onclick="setLtvPlat('${t.v}',this)">${t.lbl}</button>`
-    ).join('');
+    pEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.ltvPlat===cur));
   }
 
   // Country stays a dropdown with an "All Countries" default.
@@ -3129,28 +3176,29 @@ function renderLtvPerfDayDropdown(){
   const sel = g('ltvPerfDay');
   if(!sel) return;
   const allDays = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-  // If the previously selected day isn't available anymore, fall back to D7.
-  if(!allDays.includes(ltvPerfDay)) ltvPerfDay = allDays.includes('D7') ? 'D7' : allDays[0];
+  // If the previously selected day isn't available anymore, fall back to D28.
+  if(!allDays.includes(ltvPerfDay)) ltvPerfDay = allDays.includes('D28') ? 'D28' : allDays[0];
   sel.innerHTML = allDays.map(d => `<option value="${d}"${d===ltvPerfDay?' selected':''}>${d.replace('D','Day ')}</option>`).join('');
   // Keep period dropdown in sync with state
   const per = g('ltvPerfPeriod');
   if(per) per.value = ltvPerfPeriod;
 }
 
+// (Reset button removed from the UI — kept for potential re-wiring.)
 function resetLtvFilters(){
-  ltvFilters = { type:'Total LTV', game:'', plat:'', country:'', from:'', to:'', range:'standard', rangeDays:45 };
+  ltvFilters = { type:'Total LTV', game:'', plat:'Android', country:'', from:'', to:'', range:'standard', rangeDays:90 };
   ['ltvCountry','ltvFrom','ltvTo'].forEach(id=>{ const e=g(id); if(e) e.value=''; });
-  // Game goes back to the first game, platform back to "All"
   populateLtvDropdowns();
   document.querySelectorAll('#ltvTypeToggle button').forEach(b=>b.classList.toggle('on', b.dataset.ltvType==='Total LTV'));
   document.querySelectorAll('.ltvDayToggle button').forEach(b=>b.classList.toggle('on', b.dataset.ltvRange==='standard'));
-  setLtvDateRange(45); // re-seed default install-date window (also re-renders)
+  setLtvDateRange(90); // re-seed default install-date window (also re-renders)
 }
 
 function getLtvFiltered(){
   // Read inputs each time so manual select changes flow through.
   // Platform now comes from the tab toggle (ltvFilters.plat), not a <select>.
-  ltvFilters.game    = v('ltvGame');
+  // Game filter only applies when the selector is enabled (LTV_SHOW_GAME).
+  ltvFilters.game    = LTV_SHOW_GAME ? v('ltvGame') : '';
   ltvFilters.country = v('ltvCountry');
   ltvFilters.from    = v('ltvFrom');
   ltvFilters.to      = v('ltvTo');
