@@ -400,7 +400,7 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
 .ltvDayToggle button:hover:not(.on){color:var(--t1)}
 
 /* LTV KPI strip — denser than dashboard KPIs (no spark) */
-.ltvKpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px}
+.ltvKpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px;margin-bottom:14px}
 .ltvKpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;animation:fadeUp .5s ease both}
 .ltvKpi:hover{transform:translateY(-2px);box-shadow:var(--sh)}
 .ltvKpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--lkc,var(--teal));z-index:1}
@@ -408,11 +408,15 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
 .ltvKpi .kpiVal{font-family:'DM Mono',monospace;font-size:clamp(15px,1.5vw,20px);font-weight:500;color:var(--lkc,var(--teal));line-height:1;margin-bottom:6px;white-space:nowrap}
 .ltvKpi .kpiSub{font-size:10px;color:var(--t3);font-weight:500;display:flex;align-items:center;gap:6px}
 .lkD7{--lkc:var(--blue)}.lkD14{--lkc:var(--amber)}.lkD30{--lkc:var(--teal)}.lkGr{--lkc:var(--green)}.lkCo{--lkc:var(--coral)}
+.lkFc{--lkc:#a78bfa}
+.lkFc .kpiVal{border-bottom:1px dashed rgba(167,139,250,.5)}
 .ltvGrowth{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
 .ltvGrowth.up{background:rgba(0,196,122,.1);color:var(--green)}
 .ltvGrowth.dn{background:rgba(255,77,109,.1);color:var(--coral)}
 @media(max-width:1100px){.ltvKpis{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:640px){.ltvKpis{grid-template-columns:1fr 1fr}}
+.roasGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:900px){.roasGrid{grid-template-columns:1fr}}
 
 /* Cohort heatmap */
 .heatmapWrap{overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rs);background:var(--card2)}
@@ -792,6 +796,20 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
         <div style="position:relative;height:300px"><canvas id="targetChart"></canvas></div>
       </div>
 
+      <!-- ROAS SECTION (Adjust · d0 & d7) — above Game Analysis -->
+      <div class="secTitle" id="roasSection">📈 ROAS — Daily (d0 &amp; d7)</div>
+      <div style="font-size:11px;color:var(--t3);margin:-6px 0 14px">Return on ad spend from Adjust · per-cohort ROAS at day 0 &amp; day 7 · Android vs iOS (blended across games)</div>
+      <div class="roasGrid">
+        <div class="card">
+          <div class="cardHead"><span><span style="color:#3ddc84">●</span> Android ROAS</span><span style="font-size:10px;color:var(--t3)" id="roasAndroidSub"></span></div>
+          <div style="position:relative;height:280px"><canvas id="roasAndroidChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="cardHead"><span><span style="color:#007aff">●</span> iOS ROAS</span><span style="font-size:10px;color:var(--t3)" id="roasIosSub"></span></div>
+          <div style="position:relative;height:280px"><canvas id="roasIosChart"></canvas></div>
+        </div>
+      </div>
+
       <!-- GAME ANALYSIS SECTION -->
       <div class="secTitle" id="gameAnalysis">🎮 Game Analysis</div>
 
@@ -955,6 +973,16 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
              Default = key milestones (D7, D14, D30) on, others off. -->
         <div class="ltvDayChips" id="ltvDayChips"></div>
         <div style="position:relative;height:340px"><canvas id="ltvCurveChart"></canvas></div>
+      </div>
+
+      <!-- LTV Forecast — dedicated projection chart (D0 → D28/D30) -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="cardHead">
+          <span>LTV Forecast · D0 → target</span>
+          <span style="font-size:10px;font-weight:500;color:var(--t3);text-transform:none;letter-spacing:0">Projected cumulative LTV — historical scaling, curve-fit fallback</span>
+        </div>
+        <div class="ltvDayChips" id="ltvFcBar"></div>
+        <div style="position:relative;height:320px"><canvas id="ltvFcChart"></canvas></div>
       </div>
 
       <!-- Performance Trends — date-wise trend of a chosen cohort day -->
@@ -1338,6 +1366,7 @@ function loginSuccess(user) {
   }
   setupAutoRefresh();
   loadData();
+  loadRoasData();
 }
 
 // ── Check existing session on page load ──
@@ -1874,7 +1903,30 @@ const weekendPlugin = {
     });
   }
 };
+
 Chart.register(weekendPlugin);
+
+// ── ROAS data match with date array ──
+function buildRoasArray(dates, platform, field) {
+  if (!roasData || !roasData.length || !dates || !dates.length) return [];
+  
+  var roasMap = {};
+  roasData.forEach(function(r) {
+    if (r.plat !== platform) return;
+    var val = r[field];
+    if (val !== null && val !== undefined && !isNaN(Number(val))) {
+      if (!roasMap[r.date]) roasMap[r.date] = [];
+      roasMap[r.date].push(Number(val));
+    }
+  });
+  
+  return dates.map(function(d) {
+    var arr = roasMap[d];
+    if (!arr || !arr.length) return null;
+    var sum = arr.reduce(function(a, b) { return a + b; }, 0);
+    return Math.round((sum / arr.length) * 10000) / 10000;
+  });
+}
 
 function renderDaily(){
   const byDate={};
@@ -1886,10 +1938,12 @@ function renderDaily(){
   const labels=dates.map(d=>fmtLbl(d));
   const rois=dates.map(d=>byDate[d].spd>0?+(byDate[d].rev/byDate[d].spd).toFixed(3):null);
   const validRois=rois.filter(r=>r!==null);
-  // ROI (secondary axis) starts from 0 so the line is read against a true zero
-  // baseline (was starting near the lowest ROI, ~1.07, which exaggerated swings).
   const roiMin=0;
   const roiMax=validRois.length?Math.max(...validRois)*1.1:3;
+
+  // ── ROAS arrays (hidden by default) ──
+  const roasD0 = buildRoasArray(dates, 'Android', 'd0');
+  const roasD7 = buildRoasArray(dates, 'Android', 'd7');
 
   if(charts.daily)charts.daily.destroy();
   const ch=g('dailyChart').getContext('2d');
@@ -1900,16 +1954,40 @@ function renderDaily(){
       {label:'Spend',  data:dates.map(d=>byDate[d].spd),backgroundColor:'rgba(255,77,109,.68)',yAxisID:'y',order:2,borderRadius:2},
       {label:'Profit', data:dates.map(d=>byDate[d].pro),backgroundColor:'rgba(0,229,195,.72)',  yAxisID:'y',order:2,borderRadius:2},
       {label:'ROI',type:'line',data:rois,borderColor:'#ffb800',backgroundColor:'transparent',
-       pointBackgroundColor:'rgba(255,184,0,.45)',pointRadius:3,borderWidth:2.5,yAxisID:'y2',order:1,tension:.38,spanGaps:false}
+       pointBackgroundColor:'rgba(255,184,0,.45)',pointRadius:3,borderWidth:2.5,yAxisID:'y2',order:1,tension:.38,spanGaps:false},
+      // ── ROAS Datasets (HIDDEN by default) ──
+      {label:'ROAS D0',type:'line',data:roasD0,borderColor:'#ffb800',backgroundColor:'rgba(255,184,0,0.08)',
+       borderWidth:2,borderDash:[6,3],pointRadius:0,pointHoverRadius:4,yAxisID:'yROAS',order:3,tension:.35,fill:false,hidden:true},
+      {label:'ROAS D7',type:'line',data:roasD7,borderColor:'#00e5c3',backgroundColor:'rgba(0,229,195,0.08)',
+       borderWidth:2,borderDash:[6,3],pointRadius:0,pointHoverRadius:4,yAxisID:'yROAS',order:4,tension:.35,fill:false,hidden:true}
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,
       interaction:{mode:'index',intersect:false},
-      // Reserve breathing room on left/right so axis tick labels
-      // (esp. y2 ROI values like "1.72") don't clip after the grid removal.
       layout:{padding:{left:4,right:8,top:4,bottom:0}},
       plugins:{
-        legend:{labels:{color:tc(),font:{family:'Poppins',size:11},boxWidth:11,padding:12}},
+        legend:{labels:{color:tc(),font:{family:'Poppins',size:11},boxWidth:11,padding:12},
+          // ── Custom onClick: toggle ROAS axis visibility ──
+          onClick: function(e, item, legend) {
+            var index = item.datasetIndex;
+            var ci = legend.chart;
+            var meta = ci.getDatasetMeta(index);
+            var isRoas = (ci.data.datasets[index].label === 'ROAS D0' || ci.data.datasets[index].label === 'ROAS D7');
+            
+            // Default toggle
+            meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+            ci.update();
+            
+            // Toggle ROAS axis
+            if (isRoas) {
+              var anyRoasVisible = ci.data.datasets.some(function(ds, i) {
+                return (ds.label === 'ROAS D0' || ds.label === 'ROAS D7') && !ci.getDatasetMeta(i).hidden;
+              });
+              ci.options.scales.yROAS.display = anyRoasVisible;
+              ci.update();
+            }
+          }
+        },
         tooltip:{
           mode:'index',intersect:false,
           callbacks:{
@@ -1922,6 +2000,7 @@ function renderDaily(){
             },
             label:ctx=>{
               if(ctx.dataset.yAxisID==='y2') return ` ROI: ${ctx.parsed.y.toFixed(2)}`;
+              if(ctx.dataset.yAxisID==='yROAS') return ` ${ctx.dataset.label}: ${ctx.parsed.y==null?'—':(ctx.parsed.y*100).toFixed(1)+'%'}`;
               return ` ${ctx.dataset.label}: ${fmK(ctx.parsed.y)}`;
             },
             afterBody:items=>{
@@ -1934,17 +2013,22 @@ function renderDaily(){
         }
       },
       scales:{
-        // Grid lines removed for a cleaner, more "informative chart" feel —
-        // the data alone communicates trend, no scaffolding needed. Axis
-        // border kept off too so the plot floats on the card surface.
-        // `ticks.padding` keeps labels from butting up against the bars.
         x:{ticks:{color:tc(),font:{size:10,family:'Poppins'},maxRotation:45,padding:4},grid:{display:false},border:{display:false}},
         y:{ticks:{color:tc(),callback:v=>fmK(v),font:{family:'Poppins',size:10},padding:6},grid:{display:false},border:{display:false}},
-        y2:{position:'right',min:roiMin,max:roiMax,ticks:{color:'#ffb800',callback:v=>v.toFixed(2),font:{family:'DM Mono',size:10},padding:6},grid:{display:false},border:{display:false}}
+        y2:{position:'right',min:roiMin,max:roiMax,ticks:{color:'#ffb800',callback:v=>v.toFixed(2),font:{family:'DM Mono',size:10},padding:6},grid:{display:false},border:{display:false}},
+        // ── ROAS Y-Axis (HIDDEN by default) ──
+        yROAS:{
+          type:'linear',
+          position:'right',
+          display:false,
+          min:0,
+          ticks:{color:'#ffb800',font:{family:'DM Mono',size:10},callback:v=>(v*100).toFixed(0)+'%',padding:6},
+          grid:{display:false},
+          border:{display:false}
+        }
       }
     }
   });
-  // Store date map for weekend plugin
   charts.daily._dateMap = Object.fromEntries(dates.map((d,i)=>[i,d]));
 }
 
@@ -3032,6 +3116,9 @@ let   ltvPerfPeriod = 'daily';
 let   ltvLeadSort = { col:'D30', dir:'desc' };
 let   ltvShowAll  = false;
 let   _ltvLoaded  = false;
+// ── LTV forecasting (hybrid: historical scaling → power-law fallback) ──
+let   ltvForecastOn     = true;
+let   ltvForecastTarget = 'D30';   // 'D28' | 'D30'
 
 // Parse "PS_Android_My Supermarket Simulator" -> { plat:'Android', game:'My Supermarket Simulator' }
 function parseAppName(s){
@@ -3302,6 +3389,7 @@ function renderLtv(){
   if(!_ltvLoaded){ return; } // not opened yet
   // Sync chip + dropdown UIs with current state regardless of data presence
   renderLtvDayChips();
+  renderLtvFcBar();
   renderLtvPerfDayDropdown();
   const rows = getLtvFiltered();
   if(!rows.length){
@@ -3310,11 +3398,13 @@ function renderLtv(){
     g('ltvLeadTable').innerHTML = '';
     g('ltvShowAllBtn').style.display = 'none';
     if(charts.ltvCurve){ charts.ltvCurve.destroy(); charts.ltvCurve = null; }
+    if(charts.ltvFc){    charts.ltvFc.destroy();    charts.ltvFc    = null; }
     if(charts.ltvPerf){  charts.ltvPerf.destroy();  charts.ltvPerf  = null; }
     return;
   }
   renderLtvKpis(rows);
   renderLtvCurve(rows);
+  renderLtvForecastChart(rows);
   renderLtvPerformance();
   renderLtvHeatmap(rows);
   renderLtvLeaderboard(rows);
@@ -3332,6 +3422,95 @@ function ltvAvg(rows, day){
   return den > 0 ? num/den : 0;
 }
 
+// Weighted mean of a day + coverage (share of cohort weight that actually has it)
+function ltvAvgCov(rows, day){
+  let num=0, den=0, tot=0;
+  rows.forEach(r=>{
+    const w = r.cohortSize || 1; tot += w;
+    const val = r.days[day];
+    if(val == null || isNaN(val)) return;
+    num += val*w; den += w;
+  });
+  return { val: den>0 ? num/den : null, cov: tot>0 ? den/tot : 0 };
+}
+
+const _dnum = d => parseInt(String(d).replace('D',''), 10);
+
+/* ── HYBRID LTV FORECAST ─────────────────────────────────────────────
+   Primary: "shape from history, level from cohort" — scale the current
+   anchor value by the average ratio curve of matured cohorts.
+   Fallback: power-law (y = a·x^b) fit on the actual points.
+   Returns { actual, forecast (per day), anchor, method, targetVal }. */
+function ltvForecastFor(rows, days, target){
+  if(!rows || !rows.length) return null;
+  const tnum = _dnum(target);
+  const list = days.filter(d => _dnum(d) <= tnum);
+  const actual = {}, cov = {};
+  list.forEach(d => { const a = ltvAvgCov(rows, d); actual[d] = a.val; cov[d] = a.cov; });
+
+  // Anchor = latest day (≤ target) with solid coverage (≥50%); else latest with any data
+  let anchor = null;
+  list.forEach(d => { if(actual[d] != null && cov[d] >= 0.5) anchor = d; });
+  if(!anchor) list.forEach(d => { if(actual[d] != null) anchor = d; });
+  if(!anchor) return null;
+  const aNum = _dnum(anchor), aVal = actual[anchor];
+
+  // Matured cohorts = have both anchor and target actuals
+  const matured = rows.filter(r => {
+    const va = r.days[anchor], vt = r.days[target];
+    return va != null && !isNaN(va) && va > 0 && vt != null && !isNaN(vt);
+  });
+  const maturedWeight = matured.reduce((s,r)=>s+(r.cohortSize||0), 0);
+  const forecast = {}; let method;
+
+  if(matured.length >= 3 && maturedWeight > 0){
+    method = 'scaling';
+    list.forEach(d => {
+      if(_dnum(d) <= aNum){ forecast[d] = actual[d]; return; }
+      let num=0, den=0;
+      matured.forEach(r => {
+        const vd=r.days[d], va=r.days[anchor];
+        if(vd==null||va==null||isNaN(vd)||isNaN(va)||va<=0) return;
+        const w=r.cohortSize||1; num += (vd/va)*w; den += w;
+      });
+      forecast[d] = den>0 ? aVal*(num/den) : null;
+    });
+  } else {
+    method = 'curve';
+    const pts = [];
+    list.forEach(d => { const x=_dnum(d); if(x>=1 && actual[d]!=null && actual[d]>0) pts.push([x, actual[d]]); });
+    let a=null, b=null;
+    if(pts.length >= 2){
+      let sx=0,sy=0,sxx=0,sxy=0, n=pts.length;
+      pts.forEach(([x,y])=>{ const lx=Math.log(x), ly=Math.log(y); sx+=lx; sy+=ly; sxx+=lx*lx; sxy+=lx*ly; });
+      const denom = n*sxx - sx*sx;
+      if(denom !== 0){ b = (n*sxy - sx*sy)/denom; a = Math.exp((sy - b*sx)/n); }
+    }
+    list.forEach(d => {
+      const x=_dnum(d);
+      if(x <= aNum){ forecast[d] = actual[d]; return; }
+      forecast[d] = (a!=null && b!=null) ? a*Math.pow(x, b) : null;
+    });
+    // Make the fitted curve continuous at the anchor
+    if(a!=null){
+      const fa = a*Math.pow(aNum, b);
+      if(fa > 0){ const k = aVal/fa; list.forEach(d => { if(_dnum(d) > aNum && forecast[d]!=null) forecast[d] *= k; }); }
+    }
+  }
+  return { actual, forecast, anchor, method, cohorts: matured.length, targetVal: forecast[target] };
+}
+
+function renderLtvFcBar(){
+  const el = g('ltvFcBar'); if(!el) return;
+  el.innerHTML = '<span class="ltvChipLbl">Forecast</span>'
+    + `<button class="ltvDayChip${ltvForecastOn?' on':''}" onclick="toggleLtvForecast()">${ltvForecastOn?'On':'Off'}</button>`
+    + '<span class="ltvChipLbl" style="margin-left:10px">to</span>'
+    + ['D28','D30'].map(d => `<button class="ltvDayChip${ltvForecastTarget===d?' on':''}" onclick="setLtvForecastTarget('${d}')">${d}</button>`).join('')
+    + '<span id="ltvFcNote" style="font-size:10px;color:var(--t3);margin-left:12px"></span>';
+}
+function toggleLtvForecast(){ ltvForecastOn = !ltvForecastOn; renderLtvFcBar(); renderLtv(); }
+function setLtvForecastTarget(d){ ltvForecastTarget = d; renderLtvFcBar(); renderLtv(); }
+
 function renderLtvKpis(rows){
   const d7  = ltvAvg(rows, 'D7');
   const d14 = ltvAvg(rows, 'D14');
@@ -3347,12 +3526,29 @@ function renderLtvKpis(rows){
   const gr30   = d14 > 0 ? ((d30 - d14) / d14 * 100) : 0;
   const fmtUSD = n => '$' + n.toFixed(2);
 
+  // Forecast tile (est. D28/D30) — hybrid engine on the current selection
+  let fcTile = '';
+  if(ltvForecastOn){
+    const fdays = (ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD);
+    const fc = ltvForecastFor(rows, fdays, ltvForecastTarget);
+    if(fc && fc.targetVal != null){
+      const anchorVal = fc.actual[fc.anchor];
+      const lift = (anchorVal > 0) ? ((fc.targetVal - anchorVal)/anchorVal*100) : 0;
+      const methodLbl = fc.method === 'scaling' ? `scaling · ${fc.cohorts} cohorts` : 'curve-fit';
+      fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, fmtUSD(fc.targetVal),
+        `<span class="ltvGrowth up">est.</span> from ${fc.anchor} · ${methodLbl}`);
+    } else {
+      fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, '—', 'not enough data');
+    }
+  }
+
   g('ltvKpis').innerHTML = ''
     + kpiTile('lkD7',  'Avg D7 LTV',  fmtUSD(d7),  rows.length + ' cohorts')
     + kpiTile('lkD14', 'Avg D14 LTV', fmtUSD(d14), gr14 ? `<span class="ltvGrowth ${gr14>=0?'up':'dn'}">${gr14>=0?'+':''}${gr14.toFixed(1)}% vs D7</span>` : '—')
     + kpiTile('lkD30', 'Avg D30 LTV', fmtUSD(d30), gr30 ? `<span class="ltvGrowth ${gr30>=0?'up':'dn'}">${gr30>=0?'+':''}${gr30.toFixed(1)}% vs D14</span>` : '—')
     + kpiTile('lkGr',  'Growth D7→D30', `${grSign}${growth.toFixed(1)}%`, `<span class="ltvGrowth ${grCls}">${grSign}${(d30-d7).toFixed(2)} added</span>`)
-    + kpiTile('lkCo',  'Total Installs', cohortSum.toLocaleString(), 'across ' + rows.length + ' cohorts');
+    + kpiTile('lkCo',  'Total Installs', cohortSum.toLocaleString(), 'across ' + rows.length + ' cohorts')
+    + fcTile;
 }
 function kpiTile(cls, label, val, sub){
   return `<div class="ltvKpi ${cls}">
@@ -3388,26 +3584,29 @@ function renderLtvCurve(rows){
   const byType = { 'Total LTV':[], 'Ad LTV':[], 'IAP LTV':[] };
   allFiltered.forEach(r => { if(byType[r.type]) byType[r.type].push(r); });
 
+  const typeColor = { 'Total LTV':'rgb(0,229,195)', 'Ad LTV':'rgb(255,184,0)', 'IAP LTV':'rgb(77,159,255)' };
+  // Actual line is null-aware: where a day has no cohort data the line stops
+  // (instead of dropping to $0), so the dashed forecast can take over cleanly.
   const dataset = (label, color, type) => ({
-    label, data: days.map(d => +ltvAvg(byType[type], d).toFixed(2)),
+    label,
+    data: days.map(d => { const a = ltvAvgCov(byType[type], d); return a.val==null ? null : +a.val.toFixed(2); }),
     borderColor: color,
     backgroundColor: color.replace(')', ',.08)').replace('rgb','rgba'),
     borderWidth: type === ltvFilters.type ? 2.6 : 1.6,
     pointRadius: 3, pointHoverRadius: 5,
-    tension: .35, fill: type === ltvFilters.type
+    tension: .35, fill: type === ltvFilters.type, spanGaps: false
   });
+
+  const datasets = [
+    dataset('Total LTV', typeColor['Total LTV'], 'Total LTV'),
+    dataset('Ad LTV',    typeColor['Ad LTV'],    'Ad LTV'),
+    dataset('IAP LTV',   typeColor['IAP LTV'],   'IAP LTV')
+  ];
 
   if(charts.ltvCurve) charts.ltvCurve.destroy();
   charts.ltvCurve = new Chart(g('ltvCurveChart').getContext('2d'), {
     type: 'line',
-    data: {
-      labels,
-      datasets: [
-        dataset('Total LTV', 'rgb(0,229,195)', 'Total LTV'),
-        dataset('Ad LTV',    'rgb(255,184,0)', 'Ad LTV'),
-        dataset('IAP LTV',   'rgb(77,159,255)','IAP LTV')
-      ]
-    },
+    data: { labels, datasets },
     options: {
       responsive:true, maintainAspectRatio:false,
       interaction:{ mode:'index', intersect:false },
@@ -3427,6 +3626,66 @@ function renderLtvCurve(rows){
       }
     }
   });
+}
+
+/* ── LTV FORECAST CHART (dedicated card) ──
+   Selected LTV type only: solid actual up to the anchor, dashed projection
+   to the target day (D28/D30). Same hybrid engine as the KPI tile. */
+function ltvFcChartOpts(){
+  return {
+    responsive:true, maintainAspectRatio:false,
+    interaction:{ mode:'index', intersect:false },
+    plugins:{
+      legend:{ labels:{ color:tc(), font:{family:'Poppins',size:11}, boxWidth:11, padding:14 } },
+      tooltip:{ mode:'index', intersect:false, callbacks:{
+        title: items => items[0].label,
+        label: ctx  => ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
+      } }
+    },
+    scales:{
+      x:{ ticks:{color:tc(), font:{size:10,family:'Poppins'}}, grid:{color:gc()} },
+      y:{ ticks:{color:tc(), font:{family:'DM Mono',size:10}, callback:v=>'$'+v.toFixed(2)}, grid:{color:gc()}, beginAtZero:true }
+    }
+  };
+}
+function renderLtvForecastChart(rows){
+  const canvas = g('ltvFcChart'); if(!canvas) return;
+  const fcNote = g('ltvFcNote');
+  if(charts.ltvFc){ charts.ltvFc.destroy(); charts.ltvFc = null; }
+  if(!ltvForecastOn){
+    if(fcNote) fcNote.textContent = 'Forecast off — turn On to project.';
+    const cx=canvas.getContext('2d'); cx.clearRect(0,0,canvas.width,canvas.height);
+    return;
+  }
+  const allDays = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
+  const tnum = _dnum(ltvForecastTarget);
+  const days = allDays.filter(d => _dnum(d) <= tnum);
+  const labels = days.map(d => d.replace('D','Day '));
+  const type = ltvFilters.type;
+  const col  = type==='Ad LTV' ? 'rgb(255,184,0)' : (type==='IAP LTV' ? 'rgb(77,159,255)' : 'rgb(0,229,195)');
+
+  const fc = ltvForecastFor(rows, days, ltvForecastTarget);
+  if(!fc || fc.targetVal == null){
+    if(fcNote) fcNote.textContent = 'Not enough data to forecast this selection.';
+    charts.ltvFc = new Chart(canvas.getContext('2d'), { type:'line', data:{ labels, datasets:[] }, options: ltvFcChartOpts() });
+    return;
+  }
+  const aNum = _dnum(fc.anchor);
+  const actualData = days.map(d => fc.actual[d]!=null ? +fc.actual[d].toFixed(2) : null);
+  const fcData     = days.map(d => { const x=_dnum(d); if(x < aNum) return null; return fc.forecast[d]!=null ? +fc.forecast[d].toFixed(2) : null; });
+
+  charts.ltvFc = new Chart(canvas.getContext('2d'), {
+    type:'line',
+    data:{ labels, datasets:[
+      { label: type.replace(' LTV','')+' (actual)', data: actualData, borderColor: col,
+        backgroundColor: col.replace(')', ',.12)').replace('rgb','rgba'),
+        borderWidth:2.6, pointRadius:3, pointHoverRadius:5, tension:.35, fill:true, spanGaps:false },
+      { label: 'Forecast → '+ltvForecastTarget, data: fcData, borderColor: col, borderDash:[6,5],
+        borderWidth:2, pointRadius:2, pointStyle:'rectRot', pointHoverRadius:5, tension:.35, fill:false, spanGaps:true }
+    ]},
+    options: ltvFcChartOpts()
+  });
+  if(fcNote) fcNote.textContent = `Est. ${ltvForecastTarget} ${type.replace(' LTV','')}: $${fc.targetVal.toFixed(2)} · ${fc.method==='scaling'?('historical scaling · '+fc.cohorts+' cohorts'):'curve-fit'} from ${fc.anchor}`;
 }
 
 /* ── Performance Trends ──
