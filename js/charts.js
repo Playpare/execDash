@@ -36,10 +36,11 @@ function renderKPIs(){
                                    && (!_gm||r.game===_gm) && (!_pl||r.platform===_pl));
   const a14 = aggData(last14);
   const days14 = new Set(last14.map(r=>r.date)).size || 1;
-  g('kRevDay').textContent=fmFull(Math.round(a14.rev/days14));
-  g('kSpdDay').textContent=fmFull(Math.round(a14.spd/days14));
-  g('kProDay').textContent=fmFull(Math.round(a14.pro/days14));
-  g('kRoiTgt').textContent=fr2(TARGETS.roiAlert||1.20);
+  const kRevDay=g('kRevDay'), kSpdDay=g('kSpdDay'), kProDay=g('kProDay'), kRoiTgt=g('kRoiTgt');
+  kRevDay.textContent=fmFull(Math.round(a14.rev/days14));
+  kSpdDay.textContent=fmFull(Math.round(a14.spd/days14));
+  kProDay.textContent=fmFull(Math.round(a14.pro/days14));
+  kRoiTgt.textContent=fr2(TARGETS.roiAlert||1.20);
 
   // Aggregate by date for sparklines (multiple games per day)
   const sparkByDate={};
@@ -61,32 +62,34 @@ function renderKPIs(){
 }
 
 function setKPI(valId,chgId,prevId,curr,prev,upGood){
-  g(valId).textContent=fmFull(curr);
+  const valEl=g(valId), chgEl=g(chgId), prevEl=g(prevId);
+  valEl.textContent=fmFull(curr);
   if(prev>0){
     const pct=(curr-prev)/prev*100, up=pct>=0, good=upGood?up:!up;
-    g(chgId).textContent=(up?'▲':'▼')+' '+Math.abs(pct).toFixed(1)+'%';
-    g(chgId).className='kpiChg '+(good?'up':'dn');
-    g(prevId).textContent='Prev: '+fmFull(prev);
+    chgEl.textContent=(up?'▲':'▼')+' '+Math.abs(pct).toFixed(1)+'%';
+    chgEl.className='kpiChg '+(good?'up':'dn');
+    prevEl.textContent='Prev: '+fmFull(prev);
   } else {
-    g(chgId).textContent='No prev data'; g(chgId).className='kpiChg neu'; g(prevId).textContent='';
+    chgEl.textContent='No prev data'; chgEl.className='kpiChg neu'; prevEl.textContent='';
   }
 }
 function setROIKPI(curr,prev){
   const thr=TARGETS.roiAlert||1.20;
-  g('kRoiVal').textContent=curr.toFixed(2);
+  const valEl=g('kRoiVal'), chgEl=g('kRoiChg'), prevEl=g('kRoiPrev');
+  valEl.textContent=curr.toFixed(2);
   if(prev>0){
     const diff=curr-prev, up=diff>=0;
-    g('kRoiChg').textContent=(up?'▲':'▼')+' '+Math.abs(diff).toFixed(3);
-    g('kRoiChg').className='kpiChg '+(up?'up':'dn');
-    g('kRoiPrev').textContent='Prev: '+fr2(prev);
+    chgEl.textContent=(up?'▲':'▼')+' '+Math.abs(diff).toFixed(3);
+    chgEl.className='kpiChg '+(up?'up':'dn');
+    prevEl.textContent='Prev: '+fr2(prev);
   } else {
-    g('kRoiChg').textContent=curr>=thr?'✓ Above Target':'⚠ Below Target';
-    g('kRoiChg').className='kpiChg '+(curr>=thr?'up':'dn');
-    g('kRoiPrev').textContent='';
+    chgEl.textContent=curr>=thr?'✓ Above Target':'⚠ Below Target';
+    chgEl.className='kpiChg '+(curr>=thr?'up':'dn');
+    prevEl.textContent='';
   }
 }
 
-// Spark charts store — keyed by canvas id
+// Spark charts store - keyed by canvas id
 const sparkCharts={};
 
 function spark(id,vals,dates,color,labelFmt){
@@ -170,9 +173,9 @@ function spark(id,vals,dates,color,labelFmt){
   });
 }
 
-/* ═══════════════════════════════════════════════
+/* =========================
    DAILY CHART (with weekend highlights + rich tooltip)
-═══════════════════════════════════════════════ */
+========================= */
 // Weekend highlight plugin
 const weekendPlugin = {
   id:'weekends',
@@ -199,13 +202,13 @@ const weekendPlugin = {
 
 Chart.register(weekendPlugin);
 
-// ── ROAS data match with date array ──
+// --- ROAS data match with date array ---
 function buildRoasArray(dates, platform, field) {
   if (!roasData || !roasData.length || !dates || !dates.length) return [];
   
   var roasMap = {};
   roasData.forEach(function(r) {
-    if (r.plat !== platform) return;
+    if (platform && r.plat !== platform) return;
     var val = r[field];
     if (val !== null && val !== undefined && !isNaN(Number(val))) {
       if (!roasMap[r.date]) roasMap[r.date] = [];
@@ -234,9 +237,24 @@ function renderDaily(){
   const roiMin=0;
   const roiMax=validRois.length?Math.max(...validRois)*1.1:3;
 
-  // ── ROAS arrays (hidden by default) ──
-  const roasD0 = buildRoasArray(dates, 'Android', 'd0');
-  const roasD7 = buildRoasArray(dates, 'Android', 'd7');
+  // -- ROAS arrays (hidden by default) --
+  const roasPlatform = g('fPlat')?.value || '';
+  const roasD0 = buildRoasArray(dates, roasPlatform, 'd0');
+  const roasD7 = buildRoasArray(dates, roasPlatform, 'd7');
+  const getVisibleSecondaryAxisMax = chart => {
+    const values = [];
+    chart.data.datasets.forEach((ds, idx) => {
+      if(ds.yAxisID !== 'y2') return;
+      const meta = chart.getDatasetMeta(idx);
+      const visible = meta.hidden == null ? !ds.hidden : !meta.hidden;
+      if(!visible) return;
+      (ds.data || []).forEach(v => {
+        const n = Number(v);
+        if(v !== null && v !== undefined && !isNaN(n)) values.push(n);
+      });
+    });
+    return values.length ? Math.max(...values) * 1.1 : 3;
+  };
 
   if(charts.daily)charts.daily.destroy();
   const ch=g('dailyChart').getContext('2d');
@@ -248,11 +266,11 @@ function renderDaily(){
       {label:'Profit', data:dates.map(d=>byDate[d].pro),backgroundColor:'rgba(0,229,195,.72)',  yAxisID:'y',order:2,borderRadius:2},
       {label:'ROI',type:'line',data:rois,borderColor:'#ffb800',backgroundColor:'transparent',
        pointBackgroundColor:'rgba(255,184,0,.45)',pointRadius:3,borderWidth:2.5,yAxisID:'y2',order:1,tension:.38,spanGaps:false},
-      // ── ROAS Datasets (HIDDEN by default) ──
-      {label:'ROAS D0',type:'line',data:roasD0,borderColor:'#ffb800',backgroundColor:'rgba(255,184,0,0.08)',
-       borderWidth:2,borderDash:[6,3],pointRadius:0,pointHoverRadius:4,yAxisID:'yROAS',order:3,tension:.35,fill:false,hidden:true},
-      {label:'ROAS D7',type:'line',data:roasD7,borderColor:'#00e5c3',backgroundColor:'rgba(0,229,195,0.08)',
-       borderWidth:2,borderDash:[6,3],pointRadius:0,pointHoverRadius:4,yAxisID:'yROAS',order:4,tension:.35,fill:false,hidden:true}
+      // -- ROAS Datasets (HIDDEN by default) --
+      {label:'ROAS D0',type:'line',data:roasD0,borderColor:'#8B5CF6',backgroundColor:'rgba(139,92,246,0.15)',
+       borderWidth:2,borderDash:[6,3],pointRadius:0,pointHoverRadius:4,yAxisID:'y2',order:3,tension:.35,fill:false,hidden:true},
+      {label:'ROAS D7',type:'line',data:roasD7,borderColor:'#14B8A6',backgroundColor:'rgba(20,184,166,0.15)',
+       borderWidth:2,borderDash:[6,3],pointRadius:0,pointHoverRadius:4,yAxisID:'y2',order:4,tension:.35,fill:false,hidden:true}
     ]},
     options:{
       responsive:true,maintainAspectRatio:false,
@@ -260,25 +278,13 @@ function renderDaily(){
       layout:{padding:{left:4,right:8,top:4,bottom:0}},
       plugins:{
         legend:{labels:{color:tc(),font:{family:'Poppins',size:11},boxWidth:11,padding:12},
-          // ── Custom onClick: toggle ROAS axis visibility ──
           onClick: function(e, item, legend) {
             var index = item.datasetIndex;
             var ci = legend.chart;
             var meta = ci.getDatasetMeta(index);
-            var isRoas = (ci.data.datasets[index].label === 'ROAS D0' || ci.data.datasets[index].label === 'ROAS D7');
-            
-            // Default toggle
             meta.hidden = meta.hidden === null ? !ci.data.datasets[index].hidden : null;
+            ci.options.scales.y2.max = getVisibleSecondaryAxisMax(ci);
             ci.update();
-            
-            // Toggle ROAS axis
-            if (isRoas) {
-              var anyRoasVisible = ci.data.datasets.some(function(ds, i) {
-                return (ds.label === 'ROAS D0' || ds.label === 'ROAS D7') && !ci.getDatasetMeta(i).hidden;
-              });
-              ci.options.scales.yROAS.display = anyRoasVisible;
-              ci.update();
-            }
           }
         },
         tooltip:{
@@ -292,8 +298,8 @@ function renderDaily(){
               return `${dayName}, ${fmtLbl(date)}`;
             },
             label:ctx=>{
+              if(ctx.dataset.label.startsWith('ROAS')) return ` ${ctx.dataset.label}: ${ctx.parsed.y==null?'-':(ctx.parsed.y*100).toFixed(1)+'%'}`;
               if(ctx.dataset.yAxisID==='y2') return ` ROI: ${ctx.parsed.y.toFixed(2)}`;
-              if(ctx.dataset.yAxisID==='yROAS') return ` ${ctx.dataset.label}: ${ctx.parsed.y==null?'—':(ctx.parsed.y*100).toFixed(1)+'%'}`;
               return ` ${ctx.dataset.label}: ${fmK(ctx.parsed.y)}`;
             },
             afterBody:items=>{
@@ -308,33 +314,21 @@ function renderDaily(){
       scales:{
         x:{ticks:{color:tc(),font:{size:10,family:'Poppins'},maxRotation:45,padding:4},grid:{display:false},border:{display:false}},
         y:{ticks:{color:tc(),callback:v=>fmK(v),font:{family:'Poppins',size:10},padding:6},grid:{display:false},border:{display:false}},
-        y2:{position:'right',min:roiMin,max:roiMax,ticks:{color:'#ffb800',callback:v=>v.toFixed(2),font:{family:'DM Mono',size:10},padding:6},grid:{display:false},border:{display:false}},
-        // ── ROAS Y-Axis (HIDDEN by default) ──
-        yROAS:{
-          type:'linear',
-          position:'right',
-          display:false,
-          min:0,
-          ticks:{color:'#ffb800',font:{family:'DM Mono',size:10},callback:v=>(v*100).toFixed(0)+'%',padding:6},
-          grid:{display:false},
-          border:{display:false}
-        }
+        y2:{position:'right',min:roiMin,max:roiMax,ticks:{color:'#ffb800',callback:v=>v.toFixed(2),font:{family:'DM Mono',size:10},padding:6},grid:{display:false},border:{display:false}}
       }
     }
   });
   charts.daily._dateMap = Object.fromEntries(dates.map((d,i)=>[i,d]));
 }
 
-/* ═══════════════════════════════════════════════
-   PROJECTED MONTH END
-═══════════════════════════════════════════════ */
-/* ═══ MONTH FILTER STATE ═══ */
+/*  PROJECTED MONTH END */
+/*  MONTH FILTER STATE  */
 let projSelectedMonth = ''; // '' = current month
 let selectedQuarter = Math.floor(dataNow().getMonth() / 3) + 1; // default = current quarter (yesterday-based, data ke hisab se)
 
 function selectQuarter(q, btnEl) {
   selectedQuarter = q;
-  document.querySelectorAll('.qPill').forEach(b => b.classList.remove('active'));
+  cachedList('qPills','.qPill').forEach(b => b.classList.remove('active'));
   btnEl.classList.add('active');
   renderProjected();
 }
@@ -351,9 +345,21 @@ function quarterTarget(q, yr) {
   return quarterMonths(q, yr).reduce((s,ym)=>s+(TARGETS.months?.[ym]?.profit||0),0);
 }
 
+function completedQuarterCount(yr) {
+  const now = dataNow();
+  if(now.getFullYear() < yr) return 0;
+  if(now.getFullYear() > yr) return 4;
+  return [
+    new Date(yr, 2, 31),
+    new Date(yr, 5, 30),
+    new Date(yr, 8, 30),
+    new Date(yr, 11, 31)
+  ].filter(end => end <= now).length;
+}
+
 function buildMonthFilter(){
   const yr = TARGETS.year || CY;
-  const now = dataNow();   // yesterday-based — data is a day behind
+  const now = dataNow();   // yesterday-based - data is a day behind
   // Show months that have data or are current/past
   const available = MONTHS.map((_,i)=>{
     const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
@@ -368,13 +374,12 @@ function buildMonthFilter(){
   if(!projSelectedMonth) projSelectedMonth=`${yr}-${String(now.getMonth()+1).padStart(2,'0')}`;
 
   wrap.innerHTML=available.map(m=>`
-    <button class="monthPill${projSelectedMonth===m.ym?' active':''}"
-      onclick="projSelectedMonth='${m.ym}';buildMonthFilter();renderProjected()">
-      ${m.label}
+    <button class="monthPill${projSelectedMonth===m.ym?' active':''}" data-proj-month="${escapeAttr(m.ym)}">
+      ${escapeHTML(m.label)}
     </button>`).join('');
 }
 
-/* ═══ EXPONENTIAL SMOOTHING PROJECTION ═══ */
+/*  EXPONENTIAL SMOOTHING PROJECTION  */
 function expSmoothingProjection(dailyProfits){
   // Holt's simple exponential smoothing
   // alpha = smoothing factor (0.3 = give more weight to history, 0.7 = recent biased)
@@ -390,9 +395,9 @@ function expSmoothingProjection(dailyProfits){
 }
 
 // Daily-profit series for the most recent 14 days of data (yesterday-based cap).
-// This drives the "smart daily" run-rate for ALL projections — a rolling 14-day
+// This drives the "smart daily" run-rate for ALL projections. A rolling 14-day
 // window is steadier than using only the current calendar month (which can be
-// just 1–2 days early in a month). Returns oldest→newest so exp-smoothing
+// just 12 days early in a month). Returns oldest->newest so exp-smoothing
 // weights the most recent days highest.
 function last14DailyProfits(){
   const yd=new Date(); yd.setDate(yd.getDate()-1); yd.setHours(0,0,0,0);
@@ -405,11 +410,32 @@ function last14DailyProfits(){
   return Object.keys(byDate).sort().map(d=>byDate[d]);
 }
 
+function getYearProgressInsight(ytdActual, ytdTarget) {
+  const pct = ytdTarget > 0 ? (ytdActual / ytdTarget * 100) : 0;
+  const dot = pct >= 100 ? '🟢' : pct >= 95 ? '🟡' : '🔴';
+
+  if (ytdTarget <= 0) {
+    return ytdActual > 0
+      ? { text: `${dot} ${pct.toFixed(1)}%  ▲ Ahead ${fmK(ytdActual)}`, className: 'pos' }
+      : { text: `${dot} 0.0%  ● On Track`, className: 'amb' };
+  }
+
+  const diff = ytdActual - ytdTarget;
+  const tolerance = ytdTarget * 0.01;
+  if (Math.abs(diff) <= tolerance) {
+    return { text: `${dot} ${pct.toFixed(1)}%  ● On Track`, className: 'amb' };
+  }
+
+  return diff > 0
+    ? { text: `${dot} ${pct.toFixed(1)}%  ▲ Ahead ${fmK(diff)}`, className: 'pos' }
+    : { text: `${dot} ${pct.toFixed(1)}%  ▼ Behind ${fmK(Math.abs(diff))}`, className: 'neg' };
+}
+
 function renderProjected(){
   buildMonthFilter();
 
   // sync the active pill with selectedQuarter
-  document.querySelectorAll('.qPill').forEach(b =>
+  cachedList('qPills','.qPill').forEach(b =>
     b.classList.toggle('active', +b.dataset.q === selectedQuarter));
 
   const yr=TARGETS.year||CY;
@@ -438,7 +464,7 @@ function renderProjected(){
   const smartDailyAvg=expSmoothingProjection(series14);
   const daysLeft=dim-elapsed;
   // A month is COMPLETE/past when our latest data day (yesterday) is on/after its
-  // last calendar day → nothing to project, judge on actuals. On the 1st of a
+  // last calendar day -> nothing to project, judge on actuals. On the 1st of a
   // month yesterday is the prior month's last day, so the just-ended month reads
   // as complete (e.g. on 1 Jun, May shows "Achieved/Missed", not "projected").
   const _dn=dataNow();
@@ -450,9 +476,10 @@ function renderProjected(){
   const reqD=daysLeft>0&&rem>0?rem/daysLeft:0;
   const exceeded=curProfit>=target;
 
-  g('projVal').textContent=fmFull(Math.round(proj));
-  g('projTargetLbl').textContent=`Projected vs ${fmFull(target)} target`;
-  g('projPct').textContent=pct.toFixed(1)+'% of target';
+  const projValEl=g('projVal'), projTargetLblEl=g('projTargetLbl'), projPctEl=g('projPct');
+  projValEl.textContent=fmFull(Math.round(proj));
+  projTargetLblEl.textContent=`Projected vs ${fmFull(target)} target`;
+  projPctEl.textContent=pct.toFixed(1)+'% of target';
 
   // Badge
   const badge=g('projBadge');
@@ -477,9 +504,10 @@ function renderProjected(){
 
   // Progress bar
   const fillPct=target>0?Math.min(curProfit/target*100,100):0;
-  g('projBar').style.width=fillPct+'%';
-  g('projMarker').style.left='100%';
-  g('projMarkerLbl').textContent=fmFull(target);
+  const projBarEl=g('projBar'), projMarkerEl=g('projMarker'), projMarkerLblEl=g('projMarkerLbl');
+  projBarEl.style.width=fillPct+'%';
+  projMarkerEl.style.left='100%';
+  projMarkerLblEl.textContent=fmFull(target);
 
   // Metrics
   g('profitMetLbl').textContent=exceeded?'🎉 Profit (Exceeded!)':'Current Profit';
@@ -499,7 +527,7 @@ function renderProjected(){
   g('mReqDaily').textContent=reqD>0?fmFull(Math.round(reqD)):'—';
   g('mReqDaily').className='metVal '+(reqD>smartDailyAvg?'bad':'warn');
 
-  // Gap: Smart Daily Avg − Required Daily (explicit, so user doesn't subtract)
+  // Gap: Smart Daily Avg - Required Daily (explicit, so user doesn't subtract)
   const gapWrap=g('projGapWrap'), gapEl=g('projGap');
   if(gapWrap&&gapEl){
     if(reqD>0){
@@ -522,7 +550,7 @@ function renderProjected(){
     }
   }
 
-  // ═══ GAUGES — Quarter filter based ═══
+  // ═══ GAUGES ═══ — Quarter filter based on selectedQuarter (0=annual, 1-4=Q1-Q4)
   const q = selectedQuarter;
   const qMonths = quarterMonths(q, yr);
   const qLabel = q===0 ? 'Annual GP Target' : `Q${q} GP Target (${MONTHS[(q-1)*3]}–${MONTHS[Math.min((q-1)*3+2,11)]})`;
@@ -532,31 +560,51 @@ function renderProjected(){
   const qTarget = q===0 ? computeAutoTargets().annual : quarterTarget(q, yr);
 
   // Update quarter gauge title
-  if(g('qGaugeTitle')) g('qGaugeTitle').textContent = qLabel;
+  const qGaugeTitleEl=g('qGaugeTitle');
+  if(qGaugeTitleEl) qGaugeTitleEl.textContent = qLabel;
 
   // Quarter gauge
   gaugeState.q = Math.min(qTarget>0?qProfit/qTarget:0, 2);
   drawGauge('gaugeQ', gaugeState.q, '#00e5c3', null, '$0', fmK(qTarget));
-  g('gQpct').textContent = (gaugeState.q*100).toFixed(2)+'%';
-  g('gQamt').textContent = 'Profit: '+fmK(qProfit);
-  if(g('gQTarget'))  g('gQTarget').textContent  = fmK(qTarget);
-  if(g('gQAchieved')){g('gQAchieved').textContent=fmK(qProfit); g('gQAchieved').className='gDetailVal hi';}
-
-  // Year Progress - cumulative Jan to selected-month actual vs target, always full-year
-  // (independent of the Q1-Q4/Year pill above, which drives Target/Achieved instead).
-  if(g('gQYearProgress')){
-    const ytdMonths = quarterMonths(0, yr).slice(0, pymMo); // Jan..selected month
-    const ytdTarget = ytdMonths.reduce((s,m)=>s+(TARGETS.months?.[m]?.profit||0),0);
-    const ytdActual = rawData.filter(r=>r.date&&ytdMonths.includes(r.date.slice(0,7))).reduce((s,r)=>s+r.profit,0);
-    const ytdDiff = ytdActual - ytdTarget;
-    const ytdPct = ytdTarget>0 ? (ytdActual/ytdTarget*100) : 0;
-    const dot = ytdPct>=100 ? '🟢' : ytdPct>=95 ? '🟡' : '🔴';
-    let statusTxt, cls;
-    if(ytdDiff>0){ statusTxt=`▲ Ahead ${fmK(ytdDiff)}`; cls='pos'; }
-    else if(ytdDiff<0){ statusTxt=`▼ Behind ${fmK(Math.abs(ytdDiff))}`; cls='neg'; }
-    else { statusTxt='● On Track'; cls='amb'; }
-    g('gQYearProgress').textContent = `${dot} ${ytdPct.toFixed(1)}%  ${statusTxt}`;
-    g('gQYearProgress').className = 'gDetailVal '+cls;
+  const gQpctEl=g('gQpct'), gQamtEl=g('gQamt');
+  gQpctEl.textContent = (gaugeState.q*100).toFixed(2)+'%';
+  gQamtEl.textContent = 'Profit: '+fmK(qProfit);
+  const qVar = qProfit - qTarget;
+  const gDetailEl=document.querySelector('.gDetail');
+  if(gDetailEl) gDetailEl.classList.toggle('yearView', q===0);
+  const gQTargetEl=g('gQTarget'), gQAchievedEl=g('gQAchieved'), gQRemainingEl=g('gQRemaining'),
+        gQVarianceEl=g('gQVariance'), gQVarianceLabelEl=g('gQVarianceLabel'), gQReqQuarterEl=g('gQReqQuarter');
+  if(gQTargetEl)  gQTargetEl.textContent  = fmK(qTarget);
+  if(gQAchievedEl){gQAchievedEl.textContent=fmK(qProfit); gQAchievedEl.className='gDetailVal hi';}
+  if(q===0) {
+    const remainingTarget = qTarget - qProfit;
+    const remainingQuarters = 4 - completedQuarterCount(yr);
+    const requiredAvgQuarter = remainingQuarters > 0 ? remainingTarget / remainingQuarters : null;
+    if(gQRemainingEl){
+      gQRemainingEl.textContent = fmK(remainingTarget);
+      gQRemainingEl.className = 'gDetailVal ' + (remainingTarget<=0?'pos':'neg');
+    }
+    if(gQReqQuarterEl){
+      gQReqQuarterEl.textContent = requiredAvgQuarter===null ? '-' : fmK(requiredAvgQuarter);
+      gQReqQuarterEl.className = 'gDetailVal ' + (requiredAvgQuarter!==null && requiredAvgQuarter<=0?'pos':'hi');
+    }
+  }
+  if(gQVarianceLabelEl) gQVarianceLabelEl.textContent = q===0 ? 'Year Progress' : 'Variance';
+  if(gQVarianceEl){
+    if(q===0){
+      // Year Progress = cumulative Jan -> selected month, always full-year pace
+      // (distinct from qProfit/qTarget above, which are the FULL annual totals
+      // used by the Target/Achieved cards and the gauge itself).
+      const ytdMonths = quarterMonths(0, yr).slice(0, pymMo);
+      const ytdTarget = ytdMonths.reduce((s,m)=>s+(TARGETS.months?.[m]?.profit||0),0);
+      const ytdActual = rawData.filter(r=>r.date&&ytdMonths.includes(r.date.slice(0,7))).reduce((s,r)=>s+r.profit,0);
+      const yearProgress = getYearProgressInsight(ytdActual, ytdTarget);
+      gQVarianceEl.textContent = yearProgress.text;
+      gQVarianceEl.className = 'gDetailVal ' + yearProgress.className;
+    } else {
+      gQVarianceEl.textContent = (qVar>=0?'+':'')+fmK(qVar);
+      gQVarianceEl.className = 'gDetailVal '+(qVar>=0?'pos':'neg');
+    }
   }
   // (Annual gauge removed — "Year" pill on the quarter gauge shows the full-year view)
 }
@@ -574,27 +622,25 @@ function drawGauge(id,pct,fill,track,startLbl,endLbl){
   ctx.beginPath();ctx.arc(cx,cy,r,Math.PI,Math.PI+Math.min(pct,1)*Math.PI);
   ctx.strokeStyle=fill;ctx.lineWidth=16;ctx.lineCap='round';ctx.stroke();
   ctx.shadowBlur=0;
-  // Left endpoint label — at arc start
+  // Left endpoint label  at arc start
   const lx=cx-r, ly=cy+2;
   ctx.font='700 9px Poppins';
   ctx.fillStyle=isLight?'#7a8fad':'#7a8fad';
   ctx.textAlign='center';
   ctx.fillText(startLbl||'$0', lx, ly+16);
-  // Right endpoint label — at arc end
+  // Right endpoint label  at arc end
   const rx=cx+r;
   ctx.fillStyle=isLight?'#7a8fad':'#7a8fad';
   ctx.fillText(endLbl||'', rx, ly+16);
 }
 
-/* ═══════════════════════════════════════════════
-   MONTHLY TABLE
-═══════════════════════════════════════════════ */
+/* MONTHLY TABLE */
 function renderMonthly(){
   const yr=TARGETS.year||CY;
   const now=dataNow();   // yesterday-based — data is a day behind
   const todayYm=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   // Is the data month already COMPLETE? (our latest data day = its last calendar
-  // day) → then it's judged on actuals, not shown as "projected / days left".
+  // day) -> then it's judged on actuals, not shown as "projected / days left".
   const curMonthDone = now.getDate() >= new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
   // Aggregate by month and track days with data for each month
   const byM={};
@@ -619,7 +665,7 @@ function renderMonthly(){
     const roi=d&&d.spd>0?+(d.rev/d.spd).toFixed(2):null;
     const tgtRoi=mT.roi||TARGETS.roiAlert||1.20;
 
-    // A complete current-data month (e.g. May on 1 Jun) counts as PAST → actual
+    // A complete current-data month (e.g. May on 1 Jun) counts as PAST -> actual
     // status, not "projected". The next month only becomes current once it has data.
     const isFuture=ym > todayYm;
     const isCurrent=ym === todayYm && !curMonthDone;
@@ -629,8 +675,8 @@ function renderMonthly(){
     const proj=smartDaily*dim;             // projected full-month profit at current run-rate
     const reqFull=hasTgt?mT.profit/dim:0;  // required daily across whole month
 
-    let profitCell='—', deltaCell='—', dailyCell='—',
-        roiCell='<span class="pillN">—</span>', status='<span class="pill pillN">—</span>';
+    let profitCell='', deltaCell='', dailyCell='',
+        roiCell='<span class="pillN"></span>', status='<span class="pill pillN"></span>';
 
     if(isPast){
       const pro=d?d.pro:0;
@@ -638,10 +684,10 @@ function renderMonthly(){
       const ach=hasTgt?+(pro/mT.profit*100).toFixed(1):null;
       const daysWithData=daysInMonth[ym]?daysInMonth[ym].size:0;
       const actualDaily=daysWithData>0?pro/daysWithData:0;
-      profitCell=d?fmK(pro):'—';
-      deltaCell=delta!==null?`<span class="${delta>=0?'deltaPos':'deltaNeg'}">${delta>=0?'+':''}${fmK(delta)}</span>`:'—';
-      dailyCell=d?`<span style="color:var(--t1)">${fmK(actualDaily)}</span>${hasTgt?`<div style="font-size:9px;color:var(--t3);margin-top:1px">req ${fmK(reqFull)}</div>`:''}`:'—';
-      roiCell=roi!==null?`<span class="pill ${roi>=tgtRoi?'pillG':'pillR'}">${fr2(roi)}</span>`:'<span class="pillN">—</span>';
+      profitCell=d?fmK(pro):'';
+      deltaCell=delta!==null?`<span class="${delta>=0?'deltaPos':'deltaNeg'}">${delta>=0?'+':''}${fmK(delta)}</span>`:'';
+      dailyCell=d?`<span style="color:var(--t1)">${fmK(actualDaily)}</span>${hasTgt?`<div style="font-size:9px;color:var(--t3);margin-top:1px">req ${fmK(reqFull)}</div>`:''}`:'';
+      roiCell=roi!==null?`<span class="pill ${roi>=tgtRoi?'pillG':'pillR'}">${fr2(roi)}</span>`:'<span class="pillN"></span>';
       if(ach!==null) status=`<span class="pill ${ach>=100?'pillG':'pillR'}">${ach>=100?'✓ ':''}${ach}%</span>`;
     }
     else if(isCurrent){
@@ -653,30 +699,30 @@ function renderMonthly(){
       const projPct=hasTgt?projCur/mT.profit*100:0;
       const delta=hasTgt?pro-mT.profit:null;
       profitCell=`${fmK(pro)}<div style="font-size:9px;color:var(--t3);margin-top:1px">${daysLeft} days left</div>`;
-      deltaCell=delta!==null?`<span class="${delta>=0?'deltaPos':'deltaNeg'}">${delta>=0?'+':''}${fmK(delta)}</span>`:'—';
+      deltaCell=delta!==null?`<span class="${delta>=0?'deltaPos':'deltaNeg'}">${delta>=0?'+':''}${fmK(delta)}</span>`:'';
       dailyCell=`<span style="color:var(--t1)">${fmK(smartDaily)}</span>${hasTgt&&reqNow>0?`<div style="font-size:9px;color:var(--t3);margin-top:1px">req ${fmK(reqNow)}</div>`:''}`;
-      roiCell=roi!==null?`<span class="pill ${roi>=tgtRoi?'pillG':'pillR'}">${fr2(roi)}</span>`:'<span class="pillN">—</span>';
-      status=hasTgt?`<span class="pill pillC">◑ ${projPct.toFixed(1)}% projected</span>`:`<span class="pill pillC">In Progress</span>`;
+      roiCell=roi!==null?`<span class="pill ${roi>=tgtRoi?'pillG':'pillR'}">${fr2(roi)}</span>`:'<span class="pillN"></span>';
+      status=hasTgt?`<span class="pill pillC">◔ ${projPct.toFixed(1)}% projected</span>`:`<span class="pill pillC">In Progress</span>`;
     }
     else if(isFuture){
       const projPct=hasTgt?proj/mT.profit*100:0;
       const delta=hasTgt?proj-mT.profit:null;
-      profitCell=hasTgt?`<span style="color:var(--t3)">~${fmK(proj)}</span>`:'—';
-      deltaCell=delta!==null?`<span style="color:var(--t3)">~${delta>=0?'+':'−'}${fmK(Math.abs(delta))}</span>`:'—';
-      dailyCell=hasTgt?`<span style="color:var(--t1)">${fmK(smartDaily)}</span><div style="font-size:9px;color:var(--t3);margin-top:1px">need ${fmK(reqFull)}</div>`:'—';
+      profitCell=hasTgt?`<span style="color:var(--t3)">~${fmK(proj)}</span>`:'';
+      deltaCell=delta!==null?`<span style="color:var(--t3)">~${delta>=0?'+':'−'}${fmK(Math.abs(delta))}</span>`:'';
+      dailyCell=hasTgt?`<span style="color:var(--t1)">${fmK(smartDaily)}</span><div style="font-size:9px;color:var(--t3);margin-top:1px">need ${fmK(reqFull)}</div>`:'';
       roiCell=`<span style="color:var(--t3);font-family:'DM Mono',monospace">${fr2(tgtRoi)}</span>`;
       if(hasTgt){
         const cls=projPct>=100?'pillG':projPct>=80?'pillA':'pillR';
-        const arr=projPct>=80?'↗':'↘';
+        const arr=projPct>=80?'▲':'▼';
         status=`<span class="pill ${cls}">${arr} ${projPct.toFixed(1)}% proj</span>`;
       }
     }
 
     // Highlight the CURRENT DATA month (data is a day behind, so on 1 Jun the
-    // latest data is 31 May → May stays highlighted even though it's complete).
+    // latest data is 31 May -> May stays highlighted even though it's complete).
     return`<tr${ym===todayYm?' class="curRow"':''}>
       <td class="nameCol">${mn} '${String(yr).slice(2)}</td>
-      <td>${hasTgt?fm(mT.profit):'<span class="pillN">—</span>'}</td>
+      <td>${hasTgt?fm(mT.profit):'<span class="pillN"></span>'}</td>
       <td>${profitCell}</td>
       <td>${deltaCell}</td>
       <td>${dailyCell}</td>
@@ -687,9 +733,7 @@ function renderMonthly(){
   g('monthlyBody').innerHTML=rows.join('');
 }
 
-/* ═══════════════════════════════════════════════
-   TARGET vs ACTUAL CHART (with rich tooltip + variance)
-═══════════════════════════════════════════════ */
+/* TARGET vs ACTUAL CHART (with rich tooltip + variance) */
 function renderTargetChart(){
   const yr=TARGETS.year||CY;
   // Force destroy existing chart completely
@@ -722,7 +766,7 @@ function renderTargetChart(){
     type:'bar',
     data:{labels:MONTHS,datasets:[
       {label:'Actual Profit',data:actP,backgroundColor:'rgba(0,229,195,.68)',yAxisID:'y',order:3,borderRadius:3},
-      {label:'Variance (Actual−Target)',data:variance,
+      {label:'Variance (Actual-Target)',data:variance,
        backgroundColor:variance.map(v=>v===null?'transparent':v>=0?'rgba(0,196,122,.5)':'rgba(255,77,109,.5)'),
        yAxisID:'y',order:2,borderRadius:3},
       {label:'Target Profit',type:'line',data:tgtP,borderColor:'#4d9fff',borderDash:[5,4],
@@ -744,8 +788,8 @@ function renderTargetChart(){
             label:ctx=>{
               const i=ctx.dataIndex;
               const lbl=ctx.dataset.label;
-              if(lbl.includes('ROI')||lbl.includes('roi')) return ` ${lbl}: ${ctx.parsed.y!==null?fr2(ctx.parsed.y):'—'}`;
-              return ` ${lbl}: ${ctx.parsed.y!==null?fmK(ctx.parsed.y):'—'}`;
+              if(lbl.includes('ROI')||lbl.includes('roi')) return ` ${lbl}: ${ctx.parsed.y!==null?fr2(ctx.parsed.y):''}`;
+              return ` ${lbl}: ${ctx.parsed.y!==null?fmK(ctx.parsed.y):''}`;
             },
             afterBody:items=>{
               const i=items[0].dataIndex;
@@ -759,9 +803,9 @@ function renderTargetChart(){
               if(!isCompleteMonth(ym)){
                 return ach!==null ? [` Achievement: ${ach}% so far`,` (month in progress)`] : [` (month in progress)`];
               }
-              const achStr=ach!==null?(ach>=100?'✓ '+ach+'%':'✗ '+ach+'%'):'—';
+              const achStr=ach!==null?(ach>=100?'✓ '+ach+'%':'✗ '+ach+'%'):'';
               const variance=tgt?d.pro-tgt:null;
-              const varStr=variance!==null?(variance>=0?'+':'')+fmK(variance):'—';
+              const varStr=variance!==null?(variance>=0?'+':'')+fmK(variance):'';
               return[` Achievement: ${achStr}`,` vs Target: ${varStr}`];
             }
           }
@@ -783,6 +827,7 @@ function renderTargetChart(){
 // │  ALERT SYSTEM TOGGLE                                          │
 // │  Set to  true  to turn the ROI alert badge + banner back on. │
 // └─────────────────────────────────────────────────────────────┘
+// 
 const ALERTS_ENABLED = false;
 
 function renderAlerts(){
@@ -820,7 +865,7 @@ function renderAlerts(){
   if(alerts.length){
     panel.classList.add('show');badge.classList.add('show');
     g('alertCount').textContent=alerts.length;
-    g('alertList').innerHTML=alerts.map(a=>`<div class="alertItem">⚠ <b>${a.name}</b> — ROI: <b>${fr2(a.roi)}</b> (threshold: ${fr2(a.thr)})</div>`).join('');
+    g('alertList').innerHTML=alerts.map(a=>`<div class="alertItem">⚠ <b>${escapeHTML(a.name)}</b> — ROI: <b>${fr2(a.roi)}</b> (threshold: ${fr2(a.thr)})</div>`).join('');
   } else {
     panel.classList.remove('show');badge.classList.remove('show');
   }
@@ -839,7 +884,7 @@ function setGamePlatform(plat, btnEl) {
   btnEl.classList.add('active');
   // Update label
   const lbl = g('gameBarPlatLbl');
-  if(lbl) lbl.textContent = plat ? '· ' + plat : '';
+  if(lbl) lbl.textContent = plat ? '● ' + plat : '';
   renderGameBar();
   renderROIRanking();
 }
@@ -865,8 +910,10 @@ function gbarRow(name, tag, rev, pro, maxRev, rank){
   const w = Math.max(2, Math.abs(rev)/maxRev*100);
   const col = rev<0 ? 'var(--coral)' : rank===0 ? 'var(--teal)' : 'rgba(77,159,255,.45)';
   const proCol = pro>=0 ? 'var(--green)' : 'var(--coral)';
+  const safeName = escapeHTML(name);
+  const safeTag = escapeHTML(tag);
   return `<div class="gbar-row">
-    <div class="gbar-nameWrap"><div class="gbar-name">${name}${tag?` <span class="gbar-tag">${tag}</span>`:''}</div></div>
+    <div class="gbar-nameWrap"><div class="gbar-name">${safeName}${tag?` <span class="gbar-tag">${safeTag}</span>`:''}</div></div>
     <div class="gbar-track"><div class="gbar-fill" style="width:${w}%;background:${col}"></div></div>
     <div class="gbar-vals"><div class="gbar-rev"${rev<0?' style="color:var(--coral)"':''}>${fmK(rev)}</div><div class="gbar-pro">profit <span style="color:${proCol}">${fmK(pro)}</span></div></div>
   </div>`;
@@ -899,7 +946,7 @@ function renderGameBar(){
     const subMax=Math.max(...rest.map(gm=>Math.abs(gm.rev)),1);
     const subRows=rest.map(gm=>gbarRow(gm.game, tagFor(gm), gm.rev, gm.pro, subMax, 1)).join('');
     html+=`<div class="gbar-sub" style="display:${legacyExpanded?'block':'none'}">${subRows}</div>`;
-    html+=`<button class="gbar-expand" onclick="toggleLegacy()">${legacyExpanded?'▴ Collapse':'▾ Expand'} Legacy Portfolio (${rest.length} titles)</button>`;
+    html+=`<button class="gbar-expand" data-action="toggleLegacy">${legacyExpanded?'▴ Collapse':'▾ Expand'} Legacy Portfolio (${rest.length} titles)</button>`;
   }
 
   g('gameBarList').innerHTML = html || '<div style="text-align:center;color:var(--t3);padding:30px;font-size:12px">No data</div>';
@@ -918,7 +965,7 @@ function renderROIRanking(){
   const defaultThr=TARGETS.roiAlert||1.20;
   const CORE_RX=/supermarket/i;
 
-  const tagPill=txt=>txt?`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:rgba(255,255,255,.08);color:var(--t3);letter-spacing:.04em">${txt}</span>`:'';
+  const tagPill=txt=>txt?`<span style="font-size:9px;font-weight:700;padding:1px 6px;border-radius:20px;background:rgba(255,255,255,.08);color:var(--t3);letter-spacing:.04em">${escapeHTML(txt)}</span>`:'';
   const platTag=g=>tagPill(g.plats.size>1?'COMBINED':(g.plats.size===1?[...g.plats][0]:''));
 
   const all=Object.values(byGame).filter(g=>g.spd>0).map(g=>{
@@ -929,7 +976,7 @@ function renderROIRanking(){
   const core=all.filter(g=>CORE_RX.test(g.game)).sort((a,b)=>b.roi-a.roi);
   const legacyGames=all.filter(g=>!CORE_RX.test(g.game)).sort((a,b)=>b.roi-a.roi);
 
-  // Combined legacy aggregate → single pooled ROI
+  // Combined legacy aggregate -> single pooled ROI
   const legAgg=legacyGames.reduce((a,g)=>({rev:a.rev+g.rev,spd:a.spd+g.spd}),{rev:0,spd:0});
   const legRoi=legAgg.spd>0?+(legAgg.rev/legAgg.spd).toFixed(2):null;
 
@@ -940,7 +987,7 @@ function renderROIRanking(){
       <td style="padding:7px 6px;font-size:11px;color:var(--t3);font-family:'DM Mono',monospace;width:22px;vertical-align:middle">${rank}</td>
       <td style="padding:7px 6px;vertical-align:middle">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          <span style="font-size:12px;font-weight:${sub?500:600};color:var(--${sub?'t2':'t1'})">${name}</span>
+          <span style="font-size:12px;font-weight:${sub?500:600};color:var(--${sub?'t2':'t1'})">${escapeHTML(name)}</span>
           ${tagHtml}
         </div>
         <div style="flex:1;height:4px;background:var(--border);border-radius:99px;overflow:hidden">
@@ -948,7 +995,7 @@ function renderROIRanking(){
         </div>
       </td>
       <td style="padding:7px 6px;text-align:right;vertical-align:middle;white-space:nowrap">
-        <span class="pill ${roi!==null&&roi>=thr?'pillG':'pillR'}">${roi!==null?fr2(roi):'—'}</span>
+        <span class="pill ${roi!==null&&roi>=thr?'pillG':'pillR'}">${roi!==null?fr2(roi):''}</span>
         <div style="font-size:9px;color:var(--t3);margin-top:2px">thr: ${fr2(thr)}</div>
       </td>
     </tr>`;
@@ -957,7 +1004,7 @@ function renderROIRanking(){
   core.forEach(g=>{ html+=row(g.game, platTag(g), g.roi, g.thr, rank++, false); });
   if(legacyGames.length){
     html+=row('Legacy Portfolio', tagPill(`${legacyGames.length} titles`), legRoi, defaultThr, rank++, false);
-    legacyGames.forEach(g=>{ html+=row(g.game, platTag(g), g.roi, g.thr, '·', true); });
+    legacyGames.forEach(g=>{ html+=row(g.game, platTag(g), g.roi, g.thr, '.', true); });
   }
   g('roiRankTable').innerHTML = html ||
     `<tr><td style="padding:24px;text-align:center;color:var(--t3);font-size:12px">No ROI data</td></tr>`;
@@ -1080,8 +1127,8 @@ function renderDailySummary(){
     const bg=platBg[r.platform]||'rgba(255,255,255,.05)';
     const roiGood=roi>=(TARGETS.roiAlert||1.20);
     return`<tr>
-      <td class="nameCol" style="font-size:12px">${r.game}</td>
-      <td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:${bg};color:${col}">${r.platform}</span></td>
+      <td class="nameCol" style="font-size:12px">${escapeHTML(r.game)}</td>
+      <td><span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:${bg};color:${col}">${escapeHTML(r.platform)}</span></td>
       <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px;color:var(--blue)">${fmFull(Math.round(r.rev))}</td>
       <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px;color:var(--coral)">${fmFull(Math.round(r.spd))}</td>
       <td style="text-align:right;font-family:'DM Mono',monospace;font-size:12px;color:${r.pro>=0?'var(--green)':'var(--coral)'}">${fmFull(Math.round(r.pro))}</td>
@@ -1101,11 +1148,16 @@ function renderDailySummary(){
 ═══════════════════════════════════════════════ */
 function exportCSV(){
   const h=['Date','Game','Platform','Revenue','Spend','Profit','ROI'];
-  const rows=filteredData.map(r=>[r.date,`"${r.game}"`,r.platform,r.revenue.toFixed(2),r.spend.toFixed(2),r.profit.toFixed(2),r.roi.toFixed(4)]);
-  dlBlob(new Blob([[h,...rows].map(r=>r.join(',')).join('\n')],{type:'text/csv'}),'dashboard_export.csv');
+  const csvCell = value => `"${String(value ?? '').replace(/"/g,'""')}"`;
+  const rows=filteredData.map(r=>[r.date,r.game,r.platform,r.revenue.toFixed(2),r.spend.toFixed(2),r.profit.toFixed(2),r.roi.toFixed(4)]);
+  dlBlob(new Blob([[h,...rows].map(r=>r.map(csvCell).join(',')).join('\n')],{type:'text/csv'}),'dashboard_export.csv');
   toast('CSV exported','ok');
 }
 function exportPDF(){
+  if(!window.jspdf?.jsPDF){
+    toast('PDF export library is not loaded. Check your internet/CDN access.','err');
+    return;
+  }
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'landscape'});
   const yr=TARGETS.year||CY;
