@@ -1,6 +1,6 @@
-/* ═══════════════════════════════════════════════
+/* ══════════════════════════════════════════════════
    LOGIN / LOGOUT
-═══════════════════════════════════════════════ */
+══════════════════════════════════════════════════ */
 // ── Login button loading state ──
 function setLoginLoading(loading) {
   const btn = document.querySelector('.loginBtn');
@@ -124,9 +124,9 @@ function showFileProtocolWarning() {
       <code style="color:#ffb800">python -m http.server 8080</code><br>
       Then open: <code style="color:#ffb800">http://localhost:8080</code><br><br>
       <b style="color:#00e5c3">Option 3 — Netlify Drop:</b><br>
-      Drag the file onto <a href="https://app.netlify.com/drop" target="_blank" style="color:#4d9fff">app.netlify.com/drop</a> — free hosting
+      Drag the file onto <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer" style="color:#4d9fff">app.netlify.com/drop</a> — free hosting
     </div>
-    <button onclick="this.parentElement.parentElement.style.display='none'"
+    <button data-close-file-warning
       style="margin-top:16px;width:100%;padding:10px;background:#00e5c3;color:#020d1a;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">
       Got it ✓
     </button>
@@ -154,7 +154,6 @@ function loginSuccess(user) {
   }
   setupAutoRefresh();
   loadData();
-  loadRoasData();
 }
 
 // ── Check existing session on page load ──
