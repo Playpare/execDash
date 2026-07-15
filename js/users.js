@@ -1,6 +1,6 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    USER MANAGEMENT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 function openUserModal(){renderUserTable();g('userOverlay').classList.add('open');}
 function closeUserModal(){g('userOverlay').classList.remove('open');}
 // ── User list cache ──
@@ -13,16 +13,16 @@ async function renderUserTable(){
     if(resp.error) { toast(resp.error,'err'); return; }
     _userList = resp.users || [];
     g('uTableBody').innerHTML = _userList.map((u,i) => `<tr>
-      <td style="font-size:12px;color:var(--t1)">${escapeHTML(u.email)}</td>
-      <td style="font-size:12px;color:var(--t2)">${u.name ? escapeHTML(u.name) : '—'}</td>
-      <td><select class="uRoleSel" data-user-index="${i}">
+      <td style="font-size:12px;color:var(--t1)">${u.email}</td>
+      <td style="font-size:12px;color:var(--t2)">${u.name||'—'}</td>
+      <td><select class="uRoleSel" onchange="changeRole(${i},this.value)">
         <option value="viewer"${u.role==='viewer'?' selected':''}>Viewer</option>
         <option value="admin"${u.role==='admin'?' selected':''}>Admin</option>
       </select></td>
       <td style="text-align:center">
         <span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:10px;background:${u.active!==false?'rgba(0,196,122,.12)':'rgba(255,77,109,.12)'};color:${u.active!==false?'var(--green)':'var(--coral)'}">${u.active!==false?'Active':'Off'}</span>
       </td>
-      <td><button class="uDel" data-user-index="${i}" title="Remove user">✕</button></td>
+      <td><button class="uDel" onclick="deleteUser(${i})" title="Remove user">✕</button></td>
     </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--t3)">No users found</td></tr>';
   } catch(e) {
     toast('Cannot load users: ' + e.message,'err');
@@ -70,5 +70,3 @@ async function addUser(){
     renderUserTable();
   } catch(e) { toast('Error: '+e.message,'err'); }
 }
-
-
