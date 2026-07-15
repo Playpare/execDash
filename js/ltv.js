@@ -8,15 +8,13 @@
 const LTV_DAYS_STD = ['D0','D1','D3','D7','D14','D21','D28','D30'];
 const LTV_DAYS_EXT = ['D0','D1','D3','D7','D14','D21','D28','D30','D40','D45','D50'];
 // Days that the cumulative-curves chart starts with (other days are
-// optional — user toggles them via the chip row). Key milestones default on.
+// optional - user toggles them via the chip row). Key milestones default on.
 const LTV_DAYS_DEFAULT_VISIBLE = ['D0','D7','D14','D30'];
 let   ltvData = null;       // raw rows from Apps Script
 
-// ┌──────────────────────────────────────────────────────────────────┐
-// │  LTV GAME FILTER TOGGLE                                            │
-// │  Set to  true  to bring back the per-game dropdown in the LTV bar. │
-// │  (Off = all games blended together, no game selector shown.)       │
-// └──────────────────────────────────────────────────────────────────┘
+// LTV game filter toggle
+// Set to true to bring back the per-game dropdown in the LTV bar.
+// (Off = all games blended together, no game selector shown.)
 const LTV_SHOW_GAME = false;
 
 let   ltvFilters = { type:'Total LTV', game:'', plat:'Android', country:'', from:'', to:'', range:'standard', rangeDays:90 };
@@ -26,7 +24,7 @@ let   ltvPerfPeriod = 'daily';
 let   ltvLeadSort = { col:'D30', dir:'desc' };
 let   ltvShowAll  = false;
 let   _ltvLoaded  = false;
-// ── LTV forecasting (hybrid: historical scaling → power-law fallback) ──
+// -- LTV forecasting (hybrid: historical scaling -> power-law fallback) --
 let   ltvForecastOn     = true;
 let   ltvForecastTarget = 'D30';   // 'D28' | 'D30'
 
@@ -42,7 +40,7 @@ function parseAppName(s){
 // Sheet has an "All" / "All Countries" row that's the team's pre-aggregated
 // total (because we deliberately don't pull every country to stay under
 // API limits). Treat that row as the dropdown's default "All Countries"
-// option — don't surface it as a separate selectable country.
+// option - don't surface it as a separate selectable country.
 function isAllCountry(s){
   return /^all(\s*countries?)?$/i.test(String(s||'').trim());
 }
@@ -59,12 +57,12 @@ async function buildLtvUI(){
   renderLtv();
 }
 
-// Force a fresh pull from the sheet — used by the ⟳ Refresh button when the
+// Force a fresh pull from the sheet - used by the  Refresh button when the
 // user has just edited rows in the Google Sheet and the in-memory snapshot
 // is stale. Bypasses the _ltvLoaded gate, then re-renders.
 async function reloadLtvData(btn){
   const orig = btn ? btn.textContent : '';
-  if(btn){ btn.disabled = true; btn.textContent = '⟳ Refreshing…'; }
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Refreshing...'; }
   try {
     await loadLtvData();
     populateLtvDropdowns();
@@ -73,7 +71,7 @@ async function reloadLtvData(btn){
     if(ltvFilters.rangeDays){ setLtvDateRange(ltvFilters.rangeDays); } else { renderLtv(); }
     if(btn){ btn.textContent = '✓ Refreshed'; setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 1200); }
   } catch(e){
-    if(btn){ btn.textContent = '✕ Failed';   setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 1500); }
+    if(btn){ btn.textContent = '✗ Failed';   setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 1500); }
   }
 }
 
@@ -83,8 +81,8 @@ async function loadLtvData(){
   try {
     const token = getToken();
     if(!token) throw new Error('Not logged in');
-    // Cache-buster (_cb) defeats Google's edge cache + browser HTTP cache —
-    // without it, newly added rows in the LTV sheet take 5–15 min to appear.
+    // Cache-buster (_cb) defeats Google's edge cache + browser HTTP cache -
+    // without it, newly added rows in the LTV sheet take 5-15 min to appear.
     const url = SHEET_API_URL + '?action=ltv&token=' + encodeURIComponent(token) + '&_cb=' + Date.now();
     const res = await fetch(url, { redirect:'follow', mode:'cors', cache:'no-store' });
     if(!res.ok) throw new Error('HTTP ' + res.status);
@@ -114,11 +112,11 @@ function populateLtvDropdowns(){
   (ltvData||[]).forEach(r => {
     if(r.game) games.add(r.game);
     if(r.plat) plats.add(r.plat);
-    // Skip "All"-like values — those become the default option, not a separate one
+    // Skip "All"-like values - those become the default option, not a separate one
     if(r.country && !isAllCountry(r.country)) countries.add(r.country);
   });
 
-  // Game selector — disabled for now (LTV_SHOW_GAME). When off we hide the
+  // Game selector - disabled for now (LTV_SHOW_GAME). When off we hide the
   // dropdown and don't filter by game (all games blended). Flip the flag to
   // bring it back as a game-wise dropdown.
   const gameList = [...games].sort();
@@ -127,7 +125,7 @@ function populateLtvDropdowns(){
     if(LTV_SHOW_GAME){
       gEl.style.display = '';
       const cur = gEl.value;
-      gEl.innerHTML = gameList.map(v=>`<option value="${v}">🎮 ${v}</option>`).join('');
+      gEl.innerHTML = gameList.map(v=>`<option value="${escapeAttr(v)}"> ${escapeHTML(v)}</option>`).join('');
       gEl.value = gameList.includes(cur) ? cur : (gameList[0] || '');
       ltvFilters.game = gEl.value;
     } else {
@@ -137,36 +135,36 @@ function populateLtvDropdowns(){
     }
   }
 
-  // Platform tabs — Android / iOS only, no "All". Default to whichever has data
+  // Platform tabs - Android / iOS only, no "All". Default to whichever has data
   // (Android preferred); the buttons themselves are fixed in the markup.
   const pEl = g('ltvPlatToggle');
   if(pEl){
     let cur = ltvFilters.plat;
     if(cur!=='Android' && cur!=='iOS') cur = plats.has('Android') ? 'Android' : (plats.has('iOS') ? 'iOS' : 'Android');
     ltvFilters.plat = cur;
-    pEl.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.ltvPlat===cur));
+    cachedList('ltvPlatButtons','#ltvPlatToggle button').forEach(b=>b.classList.toggle('on', b.dataset.ltvPlat===cur));
   }
 
   // Country stays a dropdown with an "All Countries" default.
   const cEl = g('ltvCountry');
   if(cEl){
     const cur = cEl.value;
-    cEl.innerHTML = `<option value="">🌍 All Countries</option>` +
-      [...countries].sort().map(v=>`<option value="${v}">${v}</option>`).join('');
+    cEl.innerHTML = `<option value=""> All Countries</option>` +
+      [...countries].sort().map(v=>`<option value="${escapeAttr(v)}">${escapeHTML(v)}</option>`).join('');
     cEl.value = cur;
   }
 }
 
 function setLtvType(type, btn){
   ltvFilters.type = type;
-  document.querySelectorAll('#ltvTypeToggle button').forEach(b=>b.classList.toggle('on', b===btn));
+  cachedList('ltvTypeButtons','#ltvTypeToggle button').forEach(b=>b.classList.toggle('on', b===btn));
   renderLtv();
 }
 
 // Platform tab toggle (replaces the old dropdown). '' = All platforms.
 function setLtvPlat(plat, btn){
   ltvFilters.plat = plat;
-  document.querySelectorAll('#ltvPlatToggle button').forEach(b=>b.classList.toggle('on', b===btn));
+  cachedList('ltvPlatButtons','#ltvPlatToggle button').forEach(b=>b.classList.toggle('on', b===btn));
   renderLtv();
 }
 
@@ -175,7 +173,7 @@ function onLtvGameChange(){
   renderLtv();
 }
 
-// Latest install date present in the data (data runs a day behind) — anchor
+// Latest install date present in the data (data runs a day behind) - anchor
 // for the install-date range presets so they always cover real cohorts.
 function ltvAnchorDate(){
   let mx = '';
@@ -183,11 +181,11 @@ function ltvAnchorDate(){
   return mx; // 'YYYY-MM-DD' or ''
 }
 
-// Install-date range presets. days=0 → All (clears the window). Default is 45d
+// Install-date range presets. days=0 -> All (clears the window). Default is 45d
 // so cohorts old enough to have a mature D30 value are included.
 function setLtvDateRange(days){
   ltvFilters.rangeDays = days;
-  document.querySelectorAll('#ltvDateToggle button').forEach(b=>b.classList.toggle('on', +b.dataset.ltvDays===days));
+  cachedList('ltvDateButtons','#ltvDateToggle button').forEach(b=>b.classList.toggle('on', +b.dataset.ltvDays===days));
   const fromEl=g('ltvFrom'), toEl=g('ltvTo');
   if(!days){
     if(fromEl) fromEl.value=''; if(toEl) toEl.value='';
@@ -204,16 +202,16 @@ function setLtvDateRange(days){
   renderLtv();
 }
 
-// Manual edit of the From/To inputs → drop the active preset highlight.
+// Manual edit of the From/To inputs -> drop the active preset highlight.
 function onLtvDateInput(){
   ltvFilters.rangeDays = null;
-  document.querySelectorAll('#ltvDateToggle button').forEach(b=>b.classList.remove('on'));
+  cachedList('ltvDateButtons','#ltvDateToggle button').forEach(b=>b.classList.remove('on'));
   renderLtv();
 }
 
 function setLtvRange(range, btn){
   ltvFilters.range = range;
-  document.querySelectorAll('.ltvDayToggle button').forEach(b=>b.classList.toggle('on', b===btn));
+  cachedList('ltvRangeButtons','.ltvDayToggle button').forEach(b=>b.classList.toggle('on', b===btn));
   // Re-seed visible-day set so chips list reflects newly available days.
   // Keep currently-checked defaults that still exist in the active range.
   const allDays = range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
@@ -233,7 +231,8 @@ function toggleLtvDay(day){
     ltvVisibleDays.add(day);
   }
   renderLtvDayChips();
-  renderLtvCurve(getLtvFiltered());
+  getLtvFiltered();
+  renderLtvCurve(getLtvComparisonRows());
 }
 
 function renderLtvDayChips(){
@@ -243,7 +242,7 @@ function renderLtvDayChips(){
   wrap.innerHTML = '<span class="ltvChipLbl">Days on chart</span>'
     + allDays.map(d => {
         const on = ltvVisibleDays.has(d);
-        return `<button class="ltvDayChip${on?' on':''}" onclick="toggleLtvDay('${d}')">${d}</button>`;
+        return `<button class="ltvDayChip${on?' on':''}" data-ltv-day="${escapeAttr(d)}">${d}</button>`;
       }).join('');
 }
 
@@ -272,9 +271,24 @@ function getLtvFiltered(){
     if(r.type !== ltvFilters.type) return false;
     if(ltvFilters.game && r.game !== ltvFilters.game) return false;
     if(ltvFilters.plat && r.plat !== ltvFilters.plat) return false;
-    // Country filter: empty selection means "All Countries" → use the
+    // Country filter: empty selection means "All Countries" -> use the
     // pre-aggregated "All" rows in the sheet (NOT a sum of individual
     // countries, since we only have a subset of countries).
+    if(ltvFilters.country){
+      if(r.country !== ltvFilters.country) return false;
+    } else {
+      if(!isAllCountry(r.country)) return false;
+    }
+    if(ltvFilters.from && r.installDate && r.installDate < ltvFilters.from) return false;
+    if(ltvFilters.to   && r.installDate && r.installDate > ltvFilters.to)   return false;
+    return true;
+  });
+}
+
+function getLtvComparisonRows(){
+  return (ltvData||[]).filter(r=>{
+    if(ltvFilters.game && r.game !== ltvFilters.game) return false;
+    if(ltvFilters.plat && r.plat !== ltvFilters.plat) return false;
     if(ltvFilters.country){
       if(r.country !== ltvFilters.country) return false;
     } else {
@@ -303,10 +317,11 @@ function renderLtv(){
     if(charts.ltvPerf){  charts.ltvPerf.destroy();  charts.ltvPerf  = null; }
     return;
   }
+  const comparisonRows = getLtvComparisonRows();
   renderLtvKpis(rows);
-  renderLtvCurve(rows);
+  renderLtvCurve(comparisonRows);
   renderLtvForecastChart(rows);
-  renderLtvPerformance();
+  renderLtvPerformance(comparisonRows);
   renderLtvHeatmap(rows);
   renderLtvLeaderboard(rows);
 }
@@ -337,10 +352,10 @@ function ltvAvgCov(rows, day){
 
 const _dnum = d => parseInt(String(d).replace('D',''), 10);
 
-/* ── HYBRID LTV FORECAST ─────────────────────────────────────────────
-   Primary: "shape from history, level from cohort" — scale the current
+/* -- HYBRID LTV FORECAST ---------------------------------------------
+   Primary: "shape from history, level from cohort" - scale the current
    anchor value by the average ratio curve of matured cohorts.
-   Fallback: power-law (y = a·x^b) fit on the actual points.
+   Fallback: power-law (y = a.x^b) fit on the actual points.
    Returns { actual, forecast (per day), anchor, method, targetVal }. */
 function ltvForecastFor(rows, days, target){
   if(!rows || !rows.length) return null;
@@ -349,7 +364,7 @@ function ltvForecastFor(rows, days, target){
   const actual = {}, cov = {};
   list.forEach(d => { const a = ltvAvgCov(rows, d); actual[d] = a.val; cov[d] = a.cov; });
 
-  // Anchor = latest day (≤ target) with solid coverage (≥50%); else latest with any data
+  // Anchor = latest day ( target) with solid coverage (50%); else latest with any data
   let anchor = null;
   list.forEach(d => { if(actual[d] != null && cov[d] >= 0.5) anchor = d; });
   if(!anchor) list.forEach(d => { if(actual[d] != null) anchor = d; });
@@ -404,9 +419,9 @@ function ltvForecastFor(rows, days, target){
 function renderLtvFcBar(){
   const el = g('ltvFcBar'); if(!el) return;
   el.innerHTML = '<span class="ltvChipLbl">Forecast</span>'
-    + `<button class="ltvDayChip${ltvForecastOn?' on':''}" onclick="toggleLtvForecast()">${ltvForecastOn?'On':'Off'}</button>`
+    + `<button class="ltvDayChip${ltvForecastOn?' on':''}" data-ltv-forecast-toggle>${ltvForecastOn?'On':'Off'}</button>`
     + '<span class="ltvChipLbl" style="margin-left:10px">to</span>'
-    + ['D28','D30'].map(d => `<button class="ltvDayChip${ltvForecastTarget===d?' on':''}" onclick="setLtvForecastTarget('${d}')">${d}</button>`).join('')
+    + ['D28','D30'].map(d => `<button class="ltvDayChip${ltvForecastTarget===d?' on':''}" data-ltv-forecast-target="${escapeAttr(d)}">${d}</button>`).join('')
     + '<span id="ltvFcNote" style="font-size:10px;color:var(--t3);margin-left:12px"></span>';
 }
 function toggleLtvForecast(){ ltvForecastOn = !ltvForecastOn; renderLtvFcBar(); renderLtv(); }
@@ -427,25 +442,25 @@ function renderLtvKpis(rows){
   const gr30   = d14 > 0 ? ((d30 - d14) / d14 * 100) : 0;
   const fmtUSD = n => '$' + n.toFixed(2);
 
-  // Forecast tile (est. D28/D30) — hybrid engine on the current selection
+  // Forecast tile (est. D28/D30) - hybrid engine on the current selection
   let fcTile = '';
   if(ltvForecastOn){
     const fdays = (ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD);
     const fc = ltvForecastFor(rows, fdays, ltvForecastTarget);
     if(fc && fc.targetVal != null){
-      const methodLbl = fc.method === 'scaling' ? `scaling · ${fc.cohorts} cohorts` : 'curve-fit';
+      const methodLbl = fc.method === 'scaling' ? `scaling • ${fc.cohorts} cohorts` : 'curve-fit';
       fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, fmtUSD(fc.targetVal),
-        `<span class="ltvGrowth up">est.</span> from ${fc.anchor} · ${methodLbl}`);
+        `<span class="ltvGrowth up">est.</span> from ${fc.anchor} • ${methodLbl}`);
     } else {
-      fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, '—', 'not enough data');
+      fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, '-', 'not enough data');
     }
   }
 
   g('ltvKpis').innerHTML = ''
     + kpiTile('lkD7',  'Avg D7 LTV',  fmtUSD(d7),  rows.length + ' cohorts')
-    + kpiTile('lkD14', 'Avg D14 LTV', fmtUSD(d14), gr14 ? `<span class="ltvGrowth ${gr14>=0?'up':'dn'}">${gr14>=0?'+':''}${gr14.toFixed(1)}% vs D7</span>` : '—')
-    + kpiTile('lkD30', 'Avg D30 LTV', fmtUSD(d30), gr30 ? `<span class="ltvGrowth ${gr30>=0?'up':'dn'}">${gr30>=0?'+':''}${gr30.toFixed(1)}% vs D14</span>` : '—')
-    + kpiTile('lkGr',  'Growth D7→D30', `${grSign}${growth.toFixed(1)}%`, `<span class="ltvGrowth ${grCls}">${grSign}${(d30-d7).toFixed(2)} added</span>`)
+    + kpiTile('lkD14', 'Avg D14 LTV', fmtUSD(d14), gr14 ? `<span class="ltvGrowth ${gr14>=0?'up':'dn'}">${gr14>=0?'+':''}${gr14.toFixed(1)}% vs D7</span>` : '-')
+    + kpiTile('lkD30', 'Avg D30 LTV', fmtUSD(d30), gr30 ? `<span class="ltvGrowth ${gr30>=0?'up':'dn'}">${gr30>=0?'+':''}${gr30.toFixed(1)}% vs D14</span>` : '-')
+    + kpiTile('lkGr',  'Growth D7->D30', `${grSign}${growth.toFixed(1)}%`, `<span class="ltvGrowth ${grCls}">${grSign}${(d30-d7).toFixed(2)} added</span>`)
     + kpiTile('lkCo',  'Total Installs', cohortSum.toLocaleString(), 'across ' + rows.length + ' cohorts')
     + fcTile;
 }
@@ -457,7 +472,7 @@ function kpiTile(cls, label, val, sub){
   </div>`;
 }
 
-function renderLtvCurve(rows){
+function renderLtvCurve(comparisonRows){
   const allDays = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
   // Only include days the user has toggled ON via the chip row.
   // Falls back to all days if the visible-set is somehow empty.
@@ -467,18 +482,7 @@ function renderLtvCurve(rows){
   // Plot all 3 LTV types side-by-side regardless of selected type filter, so
   // user can compare composition (Ad vs IAP vs Total). Selected type drives
   // tables/KPIs only.
-  const allFiltered = (ltvData||[]).filter(r=>{
-    if(ltvFilters.game && r.game !== ltvFilters.game) return false;
-    if(ltvFilters.plat && r.plat !== ltvFilters.plat) return false;
-    if(ltvFilters.country){
-      if(r.country !== ltvFilters.country) return false;
-    } else {
-      if(!isAllCountry(r.country)) return false;
-    }
-    if(ltvFilters.from && r.installDate && r.installDate < ltvFilters.from) return false;
-    if(ltvFilters.to   && r.installDate && r.installDate > ltvFilters.to)   return false;
-    return true;
-  });
+  const allFiltered = comparisonRows || getLtvComparisonRows();
   const byType = { 'Total LTV':[], 'Ad LTV':[], 'IAP LTV':[] };
   allFiltered.forEach(r => { if(byType[r.type]) byType[r.type].push(r); });
 
@@ -526,7 +530,7 @@ function renderLtvCurve(rows){
   });
 }
 
-/* ── LTV FORECAST CHART (dedicated card) ──
+/* -- LTV FORECAST CHART (dedicated card) --
    Selected LTV type only: solid actual up to the anchor, dashed projection
    to the target day (D28/D30). Same hybrid engine as the KPI tile. */
 function ltvFcChartOpts(){
@@ -578,19 +582,19 @@ function renderLtvForecastChart(rows){
       { label: type.replace(' LTV','')+' (actual)', data: actualData, borderColor: col,
         backgroundColor: col.replace(')', ',.12)').replace('rgb','rgba'),
         borderWidth:2.6, pointRadius:3, pointHoverRadius:5, tension:.35, fill:true, spanGaps:false },
-      { label: 'Forecast → '+ltvForecastTarget, data: fcData, borderColor: col, borderDash:[6,5],
+      { label: 'Forecast -> '+ltvForecastTarget, data: fcData, borderColor: col, borderDash:[6,5],
         borderWidth:2, pointRadius:2, pointStyle:'rectRot', pointHoverRadius:5, tension:.35, fill:false, spanGaps:true }
     ]},
     options: ltvFcChartOpts()
   });
-  if(fcNote) fcNote.textContent = `Est. ${ltvForecastTarget} ${type.replace(' LTV','')}: $${fc.targetVal.toFixed(2)} · ${fc.method==='scaling'?('historical scaling · '+fc.cohorts+' cohorts'):'curve-fit'} from ${fc.anchor}`;
+  if(fcNote) fcNote.textContent = `Est. ${ltvForecastTarget} ${type.replace(' LTV','')}: $${fc.targetVal.toFixed(2)} • ${fc.method==='scaling'?('historical scaling • '+fc.cohorts+' cohorts'):'curve-fit'} from ${fc.anchor}`;
 }
 
-/* ── Performance Trends ──
+/* -- Performance Trends --
    X-axis: install date (or week / month bucket)
    Y-axis: avg LTV at the selected cohort day (D7, D14, D30, ...)
-   3 lines: Ad / IAP / Total — selected type drawn bold + filled */
-function renderLtvPerformance(){
+   3 lines: Ad / IAP / Total - selected type drawn bold + filled */
+function renderLtvPerformance(comparisonRows){
   // Pull current selections from the controls
   const dayEl = g('ltvPerfDay'), perEl = g('ltvPerfPeriod');
   if(dayEl && dayEl.value) ltvPerfDay = dayEl.value;
@@ -598,35 +602,24 @@ function renderLtvPerformance(){
 
   // Match heatmap/leaderboard scoping: respect game/plat/country/date,
   // but plot all 3 LTV types for comparison (ignore type filter here).
-  const allFiltered = (ltvData||[]).filter(r=>{
-    if(ltvFilters.game    && r.game    !== ltvFilters.game)    return false;
-    if(ltvFilters.plat    && r.plat    !== ltvFilters.plat)    return false;
-    if(ltvFilters.country){
-      if(r.country !== ltvFilters.country) return false;
-    } else {
-      if(!isAllCountry(r.country)) return false;
-    }
-    if(ltvFilters.from && r.installDate && r.installDate < ltvFilters.from) return false;
-    if(ltvFilters.to   && r.installDate && r.installDate > ltvFilters.to)   return false;
-    return true;
-  });
+  const allFiltered = comparisonRows || getLtvComparisonRows();
 
   // Bucket key per period
   const bucketOf = dateStr => {
     if(!dateStr) return '';
     if(ltvPerfPeriod === 'monthly') return dateStr.slice(0,7); // YYYY-MM
     if(ltvPerfPeriod === 'weekly'){
-      // ISO-week-ish — just snap to Monday so labels stay readable
+      // ISO-week-ish - just snap to Monday so labels stay readable
       const d = new Date(dateStr + 'T00:00:00');
       if(isNaN(d)) return dateStr;
-      const dow = d.getDay() || 7;        // Sun=0 → 7
+      const dow = d.getDay() || 7;        // Sun=0 -> 7
       d.setDate(d.getDate() - (dow-1));
       return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     }
     return dateStr;
   };
 
-  // Aggregate by (type, bucket) → cohort-size weighted avg of selected day
+  // Aggregate by (type, bucket) -> cohort-size weighted avg of selected day
   const agg = {};   // agg[type][bucket] = {num, den}
   ['Total LTV','Ad LTV','IAP LTV'].forEach(t => agg[t] = {});
   allFiltered.forEach(r => {
@@ -661,7 +654,7 @@ function renderLtvPerformance(){
       const [yr, mo] = b.split('-');
       return MONTHS[(+mo)-1] + " '" + yr.slice(2);
     }
-    // daily / weekly → "16 Mar"
+    // daily / weekly -> "16 Mar"
     return fmtLbl(b);
   };
 
@@ -696,8 +689,8 @@ function renderLtvPerformance(){
         tooltip:{
           mode:'index', intersect:false,
           callbacks:{
-            title: items => `${ltvPerfDay} · ${items[0].label}`,
-            label: ctx  => ctx.parsed.y == null ? ` ${ctx.dataset.label}: —` : ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
+            title: items => `${ltvPerfDay} • ${items[0].label}`,
+            label: ctx  => ctx.parsed.y == null ? ` ${ctx.dataset.label}: -` : ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
           }
         }
       },
@@ -712,7 +705,7 @@ function renderLtvPerformance(){
 function renderLtvHeatmap(rows){
   const days = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
 
-  // Group by install date — when game/country aren't filtered (or even when
+  // Group by install date - when game/country aren't filtered (or even when
   // they are, but multiple rows still match), collapse them into a single
   // cohort-size weighted row per date. This makes the heatmap a clean
   // time-series view; per-game breakdown lives in the Leaderboard below.
@@ -767,7 +760,7 @@ function renderLtvHeatmap(rows){
 
   // Smart label: single name if only one in the group, otherwise count.
   const labelOf = (arr, singularName, pluralName) => {
-    if(!arr.length)    return '—';
+    if(!arr.length)    return '-';
     if(arr.length===1) return arr[0];
     return arr.length + ' ' + (arr.length===1 ? singularName : pluralName);
   };
@@ -780,7 +773,7 @@ function renderLtvHeatmap(rows){
   const body = '<tbody>' + sorted.map(r => {
     const cells = days.map(d => {
       const val = r.days[d];
-      if(val == null || isNaN(val)) return '<td>—</td>';
+      if(val == null || isNaN(val)) return '<td>-</td>';
       const a = Math.min(1, val / colMax[d]) * 0.55;
       return `<td class="hmCell" style="--hmCol:rgba(0,229,195,1);--hmAlpha:${a.toFixed(3)}"><div class="hmFill"></div><span>$${val.toFixed(2)}</span></td>`;
     }).join('');
@@ -789,12 +782,12 @@ function renderLtvHeatmap(rows){
     const countryLbl = labelOf(r.countries, 'country', 'countries');
     // Tooltip shows the actual list when collapsed (helps debugging without clutter)
     const tip = (r.games.length>1 || r.countries.length>1)
-      ? `${r.games.join(', ')}${r.countries.length ? ' — ' + r.countries.join(', ') : ''}`
+      ? `${r.games.join(', ')}${r.countries.length ? ' - ' + r.countries.join(', ') : ''}`
       : '';
 
     return `<tr>
-      <td>${r.installDate||'—'}</td>
-      <td${tip ? ' title="'+tip.replace(/"/g,'&quot;')+'"' : ''}>${gameLbl} · ${countryLbl}</td>
+      <td>${escapeHTML(r.installDate||'-')}</td>
+      <td${tip ? ' title="'+escapeAttr(tip)+'"' : ''}>${escapeHTML(gameLbl)} • ${escapeHTML(countryLbl)}</td>
       <td>${(r.cohortSize||0).toLocaleString()}</td>
       ${cells}
     </tr>`;
@@ -837,14 +830,14 @@ function renderLtvLeaderboard(rows){
 
   // Header
   const cols = ['game','plat','country','cohortSize', ...days, 'growth'];
-  const colLabels = { game:'Game', plat:'Platform', country:'Country', cohortSize:'Cohort', growth:'D7→D30' };
+  const colLabels = { game:'Game', plat:'Platform', country:'Country', cohortSize:'Cohort', growth:'D7->D30' };
   days.forEach(d => colLabels[d] = d);
 
   const head = '<thead><tr>' + cols.map(c => {
     const isNum = c === 'cohortSize' || c === 'growth' || days.indexOf(c) >= 0;
     const sorted = c === sortCol ? ' sorted' : '';
-    const arrow  = c === sortCol ? (dir > 0 ? ' ▲' : ' ▼') : '';
-    return `<th class="${isNum?'numCol':''}${sorted}" onclick="setLtvLeadSort('${c}')">${colLabels[c]||c}${arrow}</th>`;
+    const arrow  = c === sortCol ? (dir > 0 ? ' ^' : ' v') : '';
+    return `<th class="${isNum?'numCol':''}${sorted}" data-ltv-sort="${escapeAttr(c)}">${colLabels[c]||c}${arrow}</th>`;
   }).join('') + '</tr></thead>';
 
   const visible = ltvShowAll ? list : list.slice(0, 10);
@@ -852,9 +845,9 @@ function renderLtvLeaderboard(rows){
 
   const body = '<tbody>' + visible.map(r => {
     return '<tr>'
-      + `<td class="gameName" title="${r.game||''}">${r.game||'—'}</td>`
-      + `<td>${r.plat||'—'}</td>`
-      + `<td>${r.country||'—'}</td>`
+      + `<td class="gameName" title="${escapeAttr(r.game||'')}">${r.game ? escapeHTML(r.game) : '-'}</td>`
+      + `<td>${r.plat ? escapeHTML(r.plat) : '-'}</td>`
+      + `<td>${r.country ? escapeHTML(r.country) : '-'}</td>`
       + `<td class="numCol">${(r.cohortSize||0).toLocaleString()}</td>`
       + days.map(d => `<td class="numCol">${fmt(r[d]||0)}</td>`).join('')
       + `<td class="numCol ${r.growth>=0?'posGr':'negGr'}">${r.growth>=0?'+':''}${r.growth.toFixed(1)}%</td>`
