@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://script.google.com https://script.googleusercontent.com; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; base-uri 'self'; object-src 'none';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src * data: blob:;">
 <title>Executive Dashboard</title>
 <!-- favicon: set at runtime from the PlaySpare cube image (see setFavicon) -->
 <link rel="icon" type="image/png" id="faviconLink"/>
@@ -276,17 +276,9 @@
               <div class="gDetailLbl">Achieved</div>
               <div class="gDetailVal hi" id="gQAchieved">—</div>
             </div>
-            <div class="gDetailItem gYearOnly">
-              <div class="gDetailLbl">Remaining</div>
-              <div class="gDetailVal" id="gQRemaining">—</div>
-            </div>
             <div class="gDetailItem">
-              <div class="gDetailLbl">Variance</div>
-              <div class="gDetailVal" id="gQVariance">—</div>
-            </div>
-            <div class="gDetailItem gYearOnly">
-              <div class="gDetailLbl">Required Avg / Quarter</div>
-              <div class="gDetailVal" id="gQReqQuarter">—</div>
+              <div class="gDetailLbl">Year Progress</div>
+              <div class="gDetailVal" id="gQYearProgress">—</div>
             </div>
           </div>
         </div>
@@ -311,6 +303,19 @@
         <div class="u-style-022"><canvas id="targetChart"></canvas></div>
       </div>
 
+      <!-- ROAS SECTION (Adjust · d0 & d7) — above Game Analysis -->
+      <div class="secTitle" id="roasSection">📈 ROAS — Daily (d0 &amp; d7)</div>
+      <div class="u-style-023">Return on ad spend from Adjust · per-cohort ROAS at day 0 &amp; day 7 · Android vs iOS (blended across games)</div>
+      <div class="roasGrid">
+        <div class="card">
+          <div class="cardHead"><span><span class="u-style-024">●</span> Android ROAS</span><span id="roasAndroidSub" class="u-style-025"></span></div>
+          <div class="u-style-026"><canvas id="roasAndroidChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="cardHead"><span><span class="u-style-027">●</span> iOS ROAS</span><span id="roasIosSub" class="u-style-025"></span></div>
+          <div class="u-style-026"><canvas id="roasIosChart"></canvas></div>
+        </div>
+      </div>
 
       <!-- GAME ANALYSIS SECTION -->
       <div class="secTitle" id="gameAnalysis">🎮 Game Analysis</div>
@@ -441,7 +446,7 @@
         <span class="tsep u-style-040"></span>
         <!-- Game: no "All" — defaults to the (only/first) game -->
         <select class="fsel" id="ltvGame"></select>
-        <select class="fsel" id="ltvCountry"><option value="">All Countries</option></select>
+        <select class="fsel" id="ltvCountry"><option value="">🌍 All Countries</option></select>
         <span class="tsep u-style-040"></span>
         <!-- Install-date range presets — default to 90d -->
         <span class="lbLbl">Range</span>
