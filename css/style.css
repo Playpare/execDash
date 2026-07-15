@@ -231,6 +231,8 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
 /* Gauge detail strip below arc */
 .gDetail{display:flex;justify-content:space-between;align-items:center;margin-top:3px;padding:6px 8px;background:var(--card2);border-radius:var(--rs);border:1px solid var(--border);width:100%}
 .gDetailItem{text-align:center}
+.gYearOnly{display:none}
+.gDetail.yearView .gYearOnly{display:block}
 .gDetailLbl{font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:2px}
 .gDetailVal{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:var(--t1)}
 .gDetailVal.pos{color:var(--green)}.gDetailVal.neg{color:var(--coral)}.gDetailVal.hi{color:var(--teal)}.gDetailVal.amb{color:var(--amber)}
