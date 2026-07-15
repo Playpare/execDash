@@ -585,7 +585,7 @@ function renderProjected(){
       gQRemainingEl.className = 'gDetailVal ' + (remainingTarget<=0?'pos':'neg');
     }
     if(gQReqQuarterEl){
-      gQReqQuarterEl.textContent = requiredAvgQuarter===null ? '-' : fmK(requiredAvgQuarter);
+      gQReqQuarterEl.textContent = requiredAvgQuarter===null ? '—' : fmK(requiredAvgQuarter);
       gQReqQuarterEl.className = 'gDetailVal ' + (requiredAvgQuarter!==null && requiredAvgQuarter<=0?'pos':'hi');
     }
   }
@@ -688,7 +688,7 @@ function renderMonthly(){
       deltaCell=delta!==null?`<span class="${delta>=0?'deltaPos':'deltaNeg'}">${delta>=0?'+':''}${fmK(delta)}</span>`:'';
       dailyCell=d?`<span style="color:var(--t1)">${fmK(actualDaily)}</span>${hasTgt?`<div style="font-size:9px;color:var(--t3);margin-top:1px">req ${fmK(reqFull)}</div>`:''}`:'';
       roiCell=roi!==null?`<span class="pill ${roi>=tgtRoi?'pillG':'pillR'}">${fr2(roi)}</span>`:'<span class="pillN"></span>';
-      if(ach!==null) status=`<span class="pill ${ach>=100?'pillG':'pillR'}">${ach>=100?'✓ ':''}${ach}%</span>`;
+      if(ach!==null) status=`<span class="pill ${ach>=100?'pillG':'pillR'}">${ach>=100?'✓ ':'✗ '}${ach}%</span>`;
     }
     else if(isCurrent){
       const pro=d?d.pro:0;
