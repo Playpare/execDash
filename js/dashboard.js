@@ -1,11 +1,11 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    TAB SWITCHING
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 function switchTab(name, btn) {
   // Targets is admin-only — block viewers even if they reach it programmatically.
   if(name==='targets' && CU?.r!=='admin') return;
-  cachedList('tabPanels','.tabPanel').forEach(p=>p.classList.remove('active'));
-  cachedList('tabButtons','.tabBtn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tabPanel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tabBtn').forEach(b=>b.classList.remove('active'));
   g('tab-'+name).classList.add('active');
   btn.classList.add('active');
   // Date bar now lives inside the dashboard panel — no manual show/hide needed.
@@ -17,9 +17,9 @@ function switchTab(name, btn) {
   if(name==='ltv')     buildLtvUI();
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    THEME
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 function toggleTheme() {
   isLight=!isLight;
   document.body.classList.toggle('lt',isLight);
@@ -28,9 +28,9 @@ function toggleTheme() {
   renderProjected(); // re-render gauges with correct params
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    DATA LOADING
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 async function loadData(forceRefresh=false) {
   showLoader(true, forceRefresh ? 'Refreshing data…' : 'Loading data…');
   try {
@@ -54,14 +54,11 @@ async function loadData(forceRefresh=false) {
       if(json.error) throw new Error('Apps Script: ' + json.error);
       if(!json.data || !Array.isArray(json.data)) throw new Error('No data array in response');
       rawData = parseJSON(json.data);
-      roasData = parseRoasJSON(json.roas || json.roasData || []);
-      if(!roasData.length) roasData = await fetchRoasData(token, forceRefresh);
       if(!rawData.length) throw new Error('0 rows — check column names in Apps Script');
       window._fromCache = json._cached || false;
     } else {
       window._fromCache = false;
       rawData = [];
-      roasData = [];
       console.warn('No SHEET_API_URL configured — connect your Apps Script /exec URL');
     }
     lastRefresh = new Date();
@@ -78,25 +75,11 @@ async function loadData(forceRefresh=false) {
     toast('Data loaded' + _cs + ' — ' + (window._dataLastDate||''), 'ok');
   } catch(e) {
     rawData = [];
-    roasData = [];
     populateFilterDropdowns();
     applyPresetDates(currentPreset);
     toast('No data — ' + e.message,'warn');
   }
   showLoader(false);
-}
-async function fetchRoasData(token, forceRefresh=false) {
-  try {
-    const refreshParam = forceRefresh ? '&refresh=1' : '';
-    const url = SHEET_API_URL + '?action=roas&token=' + encodeURIComponent(token) + refreshParam;
-    const res = await fetch(url, { redirect:'follow', mode:'cors' });
-    if(!res.ok) return [];
-    const json = JSON.parse(await res.text());
-    if(json.error) return [];
-    return parseRoasJSON(json.roas || json.roasData || json.data || []);
-  } catch(e) {
-    return [];
-  }
 }
 function refreshData() {
   loadData(true);                 // force bypass cache (dashboard data)
@@ -113,9 +96,9 @@ function updateRefreshInfo() {
 }
 setInterval(updateRefreshInfo, 30000);
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    CSV PARSE
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 function parseCSV(text) {
   const nl = text.includes('\r\n')?'\r\n':'\n';
   const lines = text.trim().split(nl).filter(l=>l.trim());
@@ -167,36 +150,9 @@ function normDate(d){
   return s;
 }
 
-function parseRoasJSON(rows) {
-  if(!Array.isArray(rows) || !rows.length) return [];
-  const norm = k=>(k||'').toLowerCase().trim().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_');
-  const toNum = v => {
-    if(v === null || v === undefined || v === '') return null;
-    const n = Number(String(v).replace(/[%,$\s]/g,''));
-    if(isNaN(n)) return null;
-    return n > 10 ? n / 100 : n;
-  };
-  return rows.map(row => {
-    const keys = Object.keys(row || {});
-    const get = (...names) => {
-      for(const name of names){
-        const key = keys.find(k => norm(k).includes(name));
-        if(key !== undefined) return row[key];
-      }
-      return null;
-    };
-    const date = normDate(get('date','day','install_date','cohort_date'));
-    const plat = String(get('platform','plat','os') || '').trim() || 'Unknown';
-    const d0 = toNum(get('d0','roas_d0','day0','day_0'));
-    const d7 = toNum(get('d7','roas_d7','day7','day_7'));
-    if(!date || (d0 === null && d7 === null)) return null;
-    return { date, plat, d0, d7 };
-  }).filter(Boolean);
-}
-
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    PARSE JSON FROM APPS SCRIPT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 function parseJSON(rows) {
   if(!Array.isArray(rows)||!rows.length) return [];
   const norm = k=>(k||'').toLowerCase().trim().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_');
@@ -232,9 +188,9 @@ function parseJSON(rows) {
 }
 
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    DATE PRESETS
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 // Yesterday = last valid date (current date excluded)
 // yesterday() removed — sheet data already reflects previous day
 
@@ -242,22 +198,21 @@ function parseJSON(rows) {
 function applyPreset(btnEl) {
   const preset = btnEl.dataset.preset;
   currentPreset = preset;
-  cachedList('presetButtons','.presetBtn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.presetBtn').forEach(b=>b.classList.remove('active'));
   btnEl.classList.add('active');
   if(preset!=='custom') applyPresetDates(preset);
 }
 function onCustomDate() {
   // User manually changed date inputs — switch to custom mode
   currentPreset='custom';
-  cachedList('presetButtons','.presetBtn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.presetBtn').forEach(b=>b.classList.remove('active'));
   // Cap fTo at yesterday
   const _capYd = new Date(); _capYd.setDate(_capYd.getDate()-1); _capYd.setHours(0,0,0,0);
   const _capStr = isoDate(_capYd);
-  const fromEl=g('fFrom'), toEl=g('fTo');
-  if(toEl && toEl.value > _capStr) toEl.value = _capStr;
-  if(fromEl && fromEl.value > _capStr) fromEl.value = _capStr;
-  dateFrom = fromEl.value;
-  dateTo   = toEl.value;
+  if(g('fTo') && g('fTo').value > _capStr) g('fTo').value = _capStr;
+  if(g('fFrom') && g('fFrom').value > _capStr) g('fFrom').value = _capStr;
+  dateFrom = g('fFrom').value;
+  dateTo   = g('fTo').value;
   applyFilters();
 }
 function applyPresetDates(preset) {
@@ -287,27 +242,26 @@ function applyPresetDates(preset) {
   }
   dateFrom=isoDate(from); dateTo=isoDate(to);
   // Update visible date inputs
-  const fromEl=g('fFrom'), toEl=g('fTo');
-  if(fromEl) fromEl.value=dateFrom;
-  if(toEl)   toEl.value=dateTo;
+  if(g('fFrom')) g('fFrom').value=dateFrom;
+  if(g('fTo'))   g('fTo').value=dateTo;
   applyFilters();
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    FILTERS
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 function populateFilterDropdowns() {
   const games=[...new Set(rawData.map(r=>r.game))].filter(Boolean).sort();
   const plats=[...new Set(rawData.map(r=>r.platform))].filter(Boolean).sort();
   setOpts('fGame',games); setOpts('fPlat',plats);
   // Populate game trend dropdown
   const sel=g('gameTrendSelect');
-  if(sel){const cur=sel.value;sel.innerHTML='<option value="">All Games (Top 6)</option>'+games.map(gm=>`<option value="${escapeAttr(gm)}">${escapeHTML(gm)}</option>`).join('');if(games.includes(cur))sel.value=cur;}
+  if(sel){const cur=sel.value;sel.innerHTML='<option value="">All Games (Top 6)</option>'+games.map(gm=>`<option value="${gm}">${gm}</option>`).join('');if(games.includes(cur))sel.value=cur;}
 }
 function setOpts(id,arr){
   const el=g(id), cur=el.value;
   const label = id==='fGame' ? '🎮 All Games' : id==='fPlat' ? '📱 All Platforms' : 'All';
-  el.innerHTML='<option value="">'+label+'</option>'+arr.map(o=>`<option value="${escapeAttr(o)}">${escapeHTML(o)}</option>`).join('');
+  el.innerHTML='<option value="">'+label+'</option>'+arr.map(o=>`<option value="${o}">${o}</option>`).join('');
   if(arr.includes(cur)) el.value=cur;
 }
 
@@ -351,6 +305,6 @@ function applyFilters() {
   renderAll();
 }
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    RENDER ALL
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
