@@ -1,215 +1,549 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   TARGETS STORE
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-const CY = new Date().getFullYear();
-function defaultTargets(yr) {
-  const t = { year:yr, roiAlert:1.20, quarter:null, annual:null, months:{}, gameRoi:{} };
-  MONTHS.forEach((_,i) => { t.months[`${yr}-${String(i+1).padStart(2,'0')}`] = {profit:350000,roi:1.20}; });
-  return t;
-}
-function loadTargets() {
-  try { const s=localStorage.getItem('ed_targets'); return s ? JSON.parse(s) : defaultTargets(CY); }
-  catch(e) { return defaultTargets(CY); }
-}
-let TARGETS = loadTargets();
-const saveTargetsStore = () => localStorage.setItem('ed_targets', JSON.stringify(TARGETS));
-let targetsEventsBound = false;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src *; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://fonts.googleapis.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src * data: blob:;">
+<title>Executive Dashboard</title>
+<!-- favicon: set at runtime from the PlaySpare cube image (see setFavicon) -->
+<link rel="icon" type="image/png" id="faviconLink"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Quicksand:wght@500;600;700&family=Syne:wght@700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="css/style.css"/>
+</head>
+<body>
+<div class="orb o1"></div><div class="orb o2"></div><div class="orb o3"></div>
 
-/* ── SHARED TARGETS (server) ───────────────────────────────────────────
-   Targets used to live only in this browser's localStorage, so they were
-   invisible on other people's machines. These two helpers sync them through
-   the Apps Script backend so every user sees the SAME goals. They fail soft:
-   if the backend / network is unavailable, we keep using the local copy.
+<!-- LOADER -->
+<div class="loader" id="loader"><div class="loaderLogoWrap"><div class="loaderGlow"></div><img class="loaderLogo" alt="" src="assets/images/playspare-cube.png"></div><div class="loaderTxt" id="loaderTxt">Loading…</div></div>
+<div class="toast" id="toast"></div>
 
-   Matches the backend contract (doGet, no doPost):
-   ▸ getTargets  → returns { targets: "<JSON string>" | null }
-   ▸ saveTargets → GET with &targets=<encoded JSON>, returns { success:true }
-                   (admin-only, enforced server-side via the login token)
-──────────────────────────────────────────────────────────────────────── */
-async function fetchTargetsFromServer(){
-  try{
-    const token = getToken(); if(!token) return null;
-    // _cb busts the browser cache so a freshly-saved set shows up immediately.
-    const json = await apiFetch({ action:'getTargets', token, _cb: Date.now() });
-    if(!json || json.error) return null;
-    let t = json.targets;                       // backend sends it as a JSON STRING
-    if(typeof t === 'string'){ try{ t = JSON.parse(t); }catch(e){ return null; } }
-    return (t && typeof t === 'object' && t.months) ? t : null;
-  }catch(e){ return null; }
-}
-
-async function saveTargetsToServer(){
-  try{
-    const token = getToken(); if(!token) return false;
-    const json = await apiFetch({ action:'saveTargets', token, targets: JSON.stringify(TARGETS) });
-    return !!(json && (json.success || json.ok) && !json.error);
-  }catch(e){ return false; }
-}
-
-// Compute quarter/annual from monthly targets
-function computeAutoTargets() {
-  const yr = TARGETS.year || CY;
-  let q1=0, total=0;
-  MONTHS.forEach((_,i) => {
-    const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
-    const p = TARGETS.months?.[ym]?.profit || 0;
-    total += p;
-    if(i<3) q1 += p;
-  });
-  return { quarter: TARGETS.quarter || q1, annual: TARGETS.annual || total };
-}
-
-
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   TARGETS UI
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-function buildTargetsUI(){
-  const isAdmin=CU?.r==='admin';
-  g('viewerMsg').classList.toggle('show',!isAdmin);
-  g('targetsEditArea').style.display=isAdmin?'block':'none';
-  if(!isAdmin)return;
-
-  const yr=TARGETS.year||CY;
-  g('tYear').value=yr;
-  g('tQuarter').value=TARGETS.quarter||'';
-  g('tAnnual').value=TARGETS.annual||'';
-
-  // Auto-calc notes
-  const auto=computeAutoTargets();
-  g('qAutoNote').textContent=`Auto from monthly: ${fmK(auto.quarter)}`;
-  g('aAutoNote').textContent=`Auto from monthly: ${fmK(auto.annual)}`;
-
-  // Monthly inputs
-  g('monthlyInputs').innerHTML=MONTHS.map((_,i)=>{
-    const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
-    const mT=TARGETS.months?.[ym]||{profit:'',roi:''};
-    return`<div class="tMonthRow">
-      <div class="tMonthLbl">${MONTHS[i]}</div>
-      <input type="number" class="tInput" id="tp_${ym}" placeholder="0" value="${mT.profit||''}"/>
-      <input type="number" class="tInput" id="tr_${ym}" placeholder="1.20" step="0.01" value="${mT.roi||''}"/>
-    </div>`;
-  }).join('');
-
-  // Per-game ROI
-  const games=[...new Set(rawData.map(r=>r.game))].filter(Boolean).sort();
-  if(games.length){
-    g('gameRoiInputs').innerHTML=games.map(gm=>{
-      const saved=TARGETS.gameRoi?.[gm]||'';
-      const key=gm.replace(/[^a-zA-Z0-9]/g,'_');
-      return`<div class="gameRoiRow">
-        <div class="gameRoiName" title="${escapeAttr(gm)}">${escapeHTML(gm)}</div>
-        <input type="number" class="tInput" id="gr_${key}" data-game="${escapeAttr(gm)}" placeholder="${fr2(TARGETS.roiAlert||1.20)}" step="0.01" value="${saved}"/>
-      </div>`;
-    }).join('');
-  } else {
-    g('gameRoiInputs').innerHTML='<div style="font-size:12px;color:var(--t3)">Load data first to see games.</div>';
-  }
-  g('bulkYearLbl').textContent=yr;
-  updateTargetPreview();
-  if(!targetsEventsBound){
-    g('monthlyInputs').addEventListener('input',onMonthInput);
-    g('tQuarter').addEventListener('input',updateTargetPreview);
-    g('tAnnual').addEventListener('input',updateTargetPreview);
-    targetsEventsBound = true;
-  }
-}
-
-function onMonthInput(){
-  const yr=+v('tYear')||TARGETS.year||CY;
-  let qSum=0,aSum=0;
-  MONTHS.forEach((_,i)=>{
-    const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
-    const p=+(g(`tp_${ym}`)?.value||0);
-    aSum+=p; if(i<3)qSum+=p;
-  });
-  g('qAutoNote').textContent=`Auto from monthly: ${fmK(qSum)}`;
-  g('aAutoNote').textContent=`Auto from monthly: ${fmK(aSum)}`;
-  updateTargetPreview();
-}
-
-function updateTargetPreview(){
-  const yr=+v('tYear')||TARGETS.year||CY;
-  const q=+v('tQuarter')||null, a=+v('tAnnual')||null;
-  let qAuto=0,aAuto=0;
-  MONTHS.forEach((_,i)=>{const ym=`${yr}-${String(i+1).padStart(2,'0')}`;const p=+(g(`tp_${ym}`)?.value||0);aAuto+=p;if(i<3)qAuto+=p;});
-  const rows=MONTHS.map((_,i)=>{
-    const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
-    const p=g(`tp_${ym}`)?.value, r=g(`tr_${ym}`)?.value;
-    return`<div class="tPrevRow"><span class="tPrevM">${MONTHS[i]}</span><div class="tPrevVals"><span class="tPrevP">${p?fmK(+p):'—'}</span><span class="tPrevR">${r?fr2(+r):'—'}</span></div></div>`;
-  }).join('');
-  g('targetPreview').innerHTML=`
-    <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-      <div class="metItem" style="flex:1"><div class="metLbl">Quarter</div><div class="metVal good">${q?fmK(q):'Auto: '+fmK(qAuto)}</div></div>
-      <div class="metItem" style="flex:1"><div class="metLbl">Annual</div><div class="metVal good">${a?fmK(a):'Auto: '+fmK(aAuto)}</div></div>
+<!-- BULK MODAL -->
+<div class="overlay" id="bulkOverlay">
+  <div class="bModal">
+    <div class="bModalH"><div class="bModalTitle">Set Full Year Targets</div><div class="bClose">✕</div></div>
+    <div class="bModalSub">Set Profit & ROI targets for all 12 months of <span id="bulkYearLbl"></span> at once.</div>
+    <div class="tMonthHeader"><span>Month</span><span>Profit Target ($)</span><span>ROI Target</span></div>
+    <div id="bulkGrid"></div>
+    <div class="u-style-001">
+      <button class="tbtn u-style-002">Cancel</button>
+      <button class="tbtn primary u-style-003">Apply Full Year Targets</button>
     </div>
-    <div style="font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);display:flex;justify-content:space-between;margin-bottom:6px">
-      <span>Month</span><span style="display:flex;gap:20px"><span style="color:var(--teal)">Profit</span><span style="color:var(--amber)">ROI</span></span>
-    </div>${rows}`;
-}
+  </div>
+</div>
 
-function saveTargets(){
-  const yr=+v('tYear')||CY;
-  TARGETS.year=yr;
-  // ROI target default — the editable field was removed (alerts are off); keep the
-  // existing value (or 1.20). Per-game / per-month ROI targets still override this.
-  TARGETS.roiAlert=TARGETS.roiAlert||1.20;
-  TARGETS.quarter=+v('tQuarter')||null; // null = auto
-  TARGETS.annual =+v('tAnnual') ||null;
-  if(!TARGETS.months)TARGETS.months={};
-  MONTHS.forEach((_,i)=>{
-    const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
-    const p=g(`tp_${ym}`)?.value, r=g(`tr_${ym}`)?.value;
-    TARGETS.months[ym]={profit:p?+p:0,roi:r?+r:1.20};
-  });
-  // per-game ROI
-  if(!TARGETS.gameRoi)TARGETS.gameRoi={};
-  document.querySelectorAll('[id^="gr_"]').forEach(el=>{
-    const gm=el.dataset.game;
-    if(gm) TARGETS.gameRoi[gm]=el.value?+el.value:null;
-  });
-  saveTargetsStore();
-  g('savedInfo').textContent='✓ Saved at '+new Date().toLocaleTimeString();
-  if(rawData.length) renderAll();
-  updateTargetPreview();
-  // Push to the server so the change is visible to all users (not just this PC).
-  saveTargetsToServer().then(ok=>{
-    if(ok){
-      toast('Targets saved & synced to all users','ok');
-      g('savedInfo').textContent='✓ Saved & synced to all users at '+new Date().toLocaleTimeString();
-    } else {
-      toast('Saved on this device — server sync unavailable','warn');
-      g('savedInfo').textContent='⚠ Saved locally only (server sync not set up) — '+new Date().toLocaleTimeString();
-    }
-  });
-}
+<!-- USER MODAL -->
+<div class="overlay" id="userOverlay">
+  <div class="uModal">
+    <div class="uModalH"><div class="uModalTitle">👥 User Management</div><div class="uClose">✕</div></div>
+    <div class="u-style-004">Login uses Gmail address + password. Only listed users can access.</div>
+    <table class="uTable"><thead><tr><th>Gmail</th><th>Display Name</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody id="uTableBody"></tbody></table>
+    <div class="u-style-005">
+      <div class="u-style-006">Add New User</div>
+      <div class="addRow">
+        <input id="newU" type="email" placeholder="gmail@gmail.com" class="u-style-003"/>
+        <input id="newName" placeholder="Display Name"/>
+        <input id="newP" type="password" placeholder="Password"/>
+        <select id="newR"><option value="viewer">Viewer</option><option value="admin">Admin</option></select>
+        <button class="tbtn primary">+ Add</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-/* BULK MODAL */
-function openBulkModal(){
-  const yr=+v('tYear')||TARGETS.year||CY;
-  g('bulkYearLbl').textContent=yr;
-  g('bulkGrid').innerHTML=MONTHS.map((_,i)=>{
-    const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
-    const mT=TARGETS.months?.[ym]||{profit:'',roi:''};
-    return`<div class="tMonthRow">
-      <div class="tMonthLbl">${MONTHS[i]}</div>
-      <input type="number" class="tInput" id="bp_${ym}" placeholder="0" value="${mT.profit||''}"/>
-      <input type="number" class="tInput" id="br_${ym}" placeholder="1.20" step="0.01" value="${mT.roi||''}"/>
-    </div>`;
-  }).join('');
-  g('bulkOverlay').classList.add('open');
-}
-function closeBulkModal(){g('bulkOverlay').classList.remove('open');}
-function saveBulkTargets(){
-  const yr=+v('tYear')||TARGETS.year||CY;
-  MONTHS.forEach((_,i)=>{
-    const ym=`${yr}-${String(i+1).padStart(2,'0')}`;
-    const p=g(`bp_${ym}`)?.value, r=g(`br_${ym}`)?.value;
-    if(g(`tp_${ym}`))g(`tp_${ym}`).value=p||'';
-    if(g(`tr_${ym}`))g(`tr_${ym}`).value=r||'';
-  });
-  closeBulkModal();
-  onMonthInput();
-  updateTargetPreview();
-  toast('Full year filled — click Save to apply','warn');
-}
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="loginCard">
+    <img class="loginWord" alt="playspare" src="assets/images/playspare-wordmark.png">
+    <div class="loginH">Executive Dashboard</div>
+    <div class="loginSub">Analytics & Performance Intelligence</div>
+    <div class="lf"><label>Gmail Address</label>
+      <div class="lInputWrap">
+        <span class="lIcon">✉</span>
+        <input id="lUser" type="email" placeholder="yourname@gmail.com" autocomplete="email"/>
+      </div>
+    </div>
+    <div class="lf"><label>Password</label>
+      <div class="lInputWrap">
+        <span class="lIcon">🔒</span>
+        <input id="lPass" type="password" placeholder="Enter password" autocomplete="current-password"/>
+        <button type="button" class="lEye" id="lEye" aria-label="Show / hide password">👁</button>
+      </div>
+    </div>
+    <button class="loginBtn">Sign In →</button>
+    <div class="loginErr" id="loginErr">⚠ Access denied.</div>
+    <div class="u-style-007">
+      <div class="u-style-008">🔒 Restricted access — authorized users only</div>
+      <div id="lockoutMsg" class="u-style-009"></div>
+    </div>
+  </div>
+</div>
 
+<!-- APP -->
+<div id="app">
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="brand"><div class="brandIcon"><img class="brandCube" alt="" src="assets/images/playspare-cube.png"></div><div class="brandName">playspare</div></div>
+    <div class="tsep"></div>
+    <div class="tabNav">
+      <button class="tabBtn active" data-tab="dashboard">Dashboard</button>
+      <button class="tabBtn" data-tab="ltv">LTV</button>
+      <button class="tabBtn u-style-010" data-tab="targets" id="targetsTabBtn">Targets</button>
+    </div>
+    <div class="topRight">
+      <div class="alertBadge" id="alertBadge">⚠ <span id="alertCount">0</span> Alerts</div>
+      <span class="refreshInfo" id="refreshInfo">—</span>
+      <button class="tbtn" id="refreshBtn">↻ Refresh</button>
+      <button class="tbtn" id="csvBtn">↓ CSV</button>
+      <button class="tbtn" id="pdfBtn">↓ PDF</button>
+      <button class="tbtn" id="themeBtn">☀ Light</button>
+      <button class="tbtn u-style-010" id="userMgmtBtn">👥 Users</button>
+      <span class="rolePill" id="rolePill"></span>
+      <span class="uname" id="unameEl"></span>
+      <button class="tbtn" id="logoutBtn">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD TAB -->
+  <div class="tabPanel active" id="tab-dashboard">
+    <div class="main">
+
+      <!-- DATE / FILTER BAR — boxed + sticky, matches LTV tab style -->
+      <div class="dateBar" id="dateBar">
+        <button class="presetBtn" data-preset="7d">Last 7D</button>
+        <button class="presetBtn active" data-preset="28d">Last 28D</button>
+        <button class="presetBtn" data-preset="thisMonth">This Month</button>
+        <button class="presetBtn" data-preset="lastMonth">Last Month</button>
+        <button class="presetBtn" data-preset="thisQuarter">This Quarter</button>
+        <button class="presetBtn" data-preset="thisYear">This Year</button>
+        <div class="tsep u-style-011"></div>
+        <select class="fsel" id="fGame"><option value="">🎮 All Games</option></select>
+        <select class="fsel" id="fPlat"><option value="">📱 All Platforms</option></select>
+        <div class="tsep u-style-011"></div>
+        <label class="u-style-012">From</label>
+        <input type="date" class="fsel" id="fFrom"/>
+        <label class="u-style-012">To</label>
+        <input type="date" class="fsel" id="fTo"/>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="alertPanel" id="alertPanel">
+        <div class="alertPanelTitle">⚠ ROI Alerts — Current Month Performance Below Threshold</div>
+        <div id="alertList"></div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="g4">
+        <div class="kpi kRev">
+          <div class="kpiMain">
+            <div class="kpiText">
+              <div class="kpiLbl">Revenue</div>
+              <div class="kpiVal" id="kRevVal">$0</div>
+              <div class="kpiBottom"><div class="kpiChg neu" id="kRevChg">—</div><div class="kpiPrev" id="kRevPrev"></div></div>
+            </div>
+            <div class="kpiSparkBox"><canvas class="kpiSpark" id="spRev"></canvas></div>
+          </div>
+          <div class="kpiFoot"><span class="kpiFootLbl">Daily Avg · 14d</span><span class="kpiFootVal" id="kRevDay">$0</span></div>
+        </div>
+        <div class="kpi kSpd">
+          <div class="kpiMain">
+            <div class="kpiText">
+              <div class="kpiLbl">Spend</div>
+              <div class="kpiVal" id="kSpdVal">$0</div>
+              <div class="kpiBottom"><div class="kpiChg neu" id="kSpdChg">—</div><div class="kpiPrev" id="kSpdPrev"></div></div>
+            </div>
+            <div class="kpiSparkBox"><canvas class="kpiSpark" id="spSpd"></canvas></div>
+          </div>
+          <div class="kpiFoot"><span class="kpiFootLbl">Daily Avg · 14d</span><span class="kpiFootVal" id="kSpdDay">$0</span></div>
+        </div>
+        <div class="kpi kPro">
+          <div class="kpiMain">
+            <div class="kpiText">
+              <div class="kpiLbl">Profit</div>
+              <div class="kpiVal" id="kProVal">$0</div>
+              <div class="kpiBottom"><div class="kpiChg neu" id="kProChg">—</div><div class="kpiPrev" id="kProPrev"></div></div>
+            </div>
+            <div class="kpiSparkBox"><canvas class="kpiSpark" id="spPro"></canvas></div>
+          </div>
+          <div class="kpiFoot"><span class="kpiFootLbl">Daily Avg · 14d</span><span class="kpiFootVal" id="kProDay">$0</span></div>
+        </div>
+        <div class="kpi kRoi">
+          <div class="kpiMain">
+            <div class="kpiText">
+              <div class="kpiLbl">Blended ROI</div>
+              <div class="kpiVal" id="kRoiVal">0.00</div>
+              <div class="kpiBottom"><div class="kpiChg neu" id="kRoiChg">—</div><div class="kpiPrev" id="kRoiPrev"></div></div>
+            </div>
+            <div class="kpiSparkBox"><canvas class="kpiSpark" id="spRoi"></canvas></div>
+          </div>
+          <div class="kpiFoot"><span class="kpiFootLbl">Target</span><span class="kpiFootVal" id="kRoiTgt">1.20</span></div>
+        </div>
+      </div>
+
+      <!-- DAILY OVERVIEW -->
+      <div class="card u-style-013">
+        <div class="cardHead"><span>📈 Daily Overview</span></div>
+        <div class="u-style-014"><canvas id="dailyChart"></canvas></div>
+      </div>
+
+      <!-- LEFT: Month Projection + Quarter gauge stacked | RIGHT: Monthly Achievement -->
+      <div class="projGrid">
+
+       <!-- LEFT COLUMN -->
+       <div class="projGaugeCol">
+
+        <!-- PROJECTED -->
+        <div class="projCard">
+          <div class="cardHead">
+            <span>🎯 Month Projection</span>
+            <span class="smartBadge">⚡ Smart EXP</span>
+          </div>
+          <!-- Month Filter -->
+          <div class="monthFilter" id="monthFilterWrap"></div>
+          <!-- Projected value -->
+          <div class="projHeader">
+            <div>
+              <div class="projBig" id="projVal">$0</div>
+              <div class="projTarget" id="projTargetLbl">— of target</div>
+            </div>
+            <div class="projBadge projOntrack" id="projBadge">On Track</div>
+          </div>
+          <div class="barWrap">
+            <div class="barTrack">
+              <div class="barFill u-style-015" id="projBar"></div>
+              <div class="barMarker u-style-016" id="projMarker">
+                <div class="barMarkerLabel" id="projMarkerLbl">Target</div>
+              </div>
+            </div>
+            <div class="barPct" id="projPct">0%</div>
+          </div>
+          <div class="metGrid">
+            <div class="metItem">
+              <div class="metLbl" id="profitMetLbl">Current Profit</div>
+              <div class="metVal good" id="mCurProfit">$0</div>
+            </div>
+            <div class="metItem">
+              <div class="metLbl" id="remMetLbl">Remaining</div>
+              <div class="metVal" id="mRemaining">$0</div>
+            </div>
+            <div class="metItem">
+              <div class="metLbl">Smart Daily Avg</div>
+              <div class="metVal" id="mDailyAvg">$0</div>
+            </div>
+            <div class="metItem">
+              <div class="metLbl">Required Daily</div>
+              <div class="metVal warn" id="mReqDaily">$0</div>
+            </div>
+          </div>
+          <!-- Smart vs Required gap -->
+          <div id="projGapWrap" class="u-style-017">
+            <span class="u-style-018">Gap (Smart Daily − Required): </span><span id="projGap"></span>
+          </div>
+          <!-- Projection method note -->
+          <div id="projMethodNote" class="u-style-019"></div>
+        </div>
+
+        <!-- GAUGES -->
+        <div class="gaugeSection">
+          <!-- Quarter selector -->
+          <div class="qFilter" id="qFilterWrap">
+            <button class="qPill" data-q="1">Q1</button>
+            <button class="qPill" data-q="2">Q2</button>
+            <button class="qPill" data-q="3">Q3</button>
+            <button class="qPill" data-q="4">Q4</button>
+            <button class="qPill u-style-020" data-q="0">Year</button>
+          </div>
+          <div class="gaugeWrap">
+            <div class="gaugeTitle" id="qGaugeTitle">Quarter GP Target</div>
+            <div class="gaugeRel">
+              <canvas id="gaugeQ" width="210" height="108"></canvas>
+            </div>
+            <div class="gaugeInfo">
+              <div class="gPct" id="gQpct">0%</div>
+              <div class="gSub">Achieved</div>
+              <div class="gAmt" id="gQamt">$0</div>
+            </div>
+          </div>
+          <!-- Quarter detail strip -->
+          <div class="gDetail">
+            <div class="gDetailItem">
+              <div class="gDetailLbl">Target</div>
+              <div class="gDetailVal" id="gQTarget">—</div>
+            </div>
+            <div class="gDetailItem">
+              <div class="gDetailLbl">Achieved</div>
+              <div class="gDetailVal hi" id="gQAchieved">—</div>
+            </div>
+            <div class="gDetailItem">
+              <div class="gDetailLbl">Year Progress</div>
+              <div class="gDetailVal" id="gQYearProgress">—</div>
+            </div>
+          </div>
+        </div>
+       </div><!-- /projGaugeCol (left column) -->
+
+        <!-- MONTHLY TABLE (right column) -->
+        <div class="card monthlyCard u-style-021">
+          <div class="cardHead"><span>📅 Monthly Achievement</span></div>
+          <table class="mTable">
+            <thead><tr>
+              <th>Month</th><th>Target</th><th>Profit</th>
+              <th>Δ vs Tgt</th><th>Daily Avg</th><th>ROI (Tgt 1.20)</th><th>Status</th>
+            </tr></thead>
+            <tbody id="monthlyBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TARGET vs ACTUAL -->
+      <div class="card u-style-013">
+        <div class="cardHead"><span>📊 Target vs Actual — Profit, ROI & Variance</span></div>
+        <div class="u-style-022"><canvas id="targetChart"></canvas></div>
+      </div>
+
+      <!-- ROAS SECTION (Adjust · d0 & d7) — above Game Analysis -->
+      <div class="secTitle" id="roasSection">📈 ROAS — Daily (d0 &amp; d7)</div>
+      <div class="u-style-023">Return on ad spend from Adjust · per-cohort ROAS at day 0 &amp; day 7 · Android vs iOS (blended across games)</div>
+      <div class="roasGrid">
+        <div class="card">
+          <div class="cardHead"><span><span class="u-style-024">●</span> Android ROAS</span><span id="roasAndroidSub" class="u-style-025"></span></div>
+          <div class="u-style-026"><canvas id="roasAndroidChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="cardHead"><span><span class="u-style-027">●</span> iOS ROAS</span><span id="roasIosSub" class="u-style-025"></span></div>
+          <div class="u-style-026"><canvas id="roasIosChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- GAME ANALYSIS SECTION -->
+      <div class="secTitle" id="gameAnalysis">🎮 Game Analysis</div>
+
+      <!-- Platform filter for game charts -->
+      <div class="u-style-028">
+        <span class="u-style-029">Platform:</span>
+        <button class="presetBtn active" data-gplat="">All</button>
+        <button class="presetBtn" data-gplat="Android">
+          <span class="u-style-024">●</span> Android
+        </button>
+        <button class="presetBtn" data-gplat="iOS">
+          <span class="u-style-027">●</span> iOS
+        </button>
+        <button class="presetBtn" data-gplat="Amazon">
+          <span class="u-style-030">●</span> Amazon
+        </button>
+      </div>
+
+      <div class="g2 u-style-013">
+        <div class="card">
+          <div class="cardHead"><span>Revenue & Profit by Game</span><span class="u-style-025">MSS combined · legacy grouped<span id="gameBarPlatLbl" class="u-style-031"></span></span></div>
+          <div id="gameBarList" class="gbar-list"></div>
+        </div>
+        <div class="card">
+          <div class="cardHead"><span>ROI Ranking — Game &amp; Platform</span></div>
+          <table id="roiRankTable" class="u-style-032"></table>
+          <button class="gbar-expand u-style-010" id="roiExpandBtn"></button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TARGETS TAB -->
+  <div class="tabPanel" id="tab-targets">
+    <div class="main">
+      <div class="viewerMsg" id="viewerMsg">🔒 Only Admins can edit targets. Contact your administrator.</div>
+      <div id="targetsEditArea" class="u-style-010">
+        <div class="targetsGrid">
+          <!-- LEFT -->
+          <div class="tCard">
+            <div class="tCardH">Performance Targets</div>
+            <div class="tCardSub">Set monthly profit & ROI goals and per-game thresholds.</div>
+
+            <!-- GLOBAL -->
+            <div class="u-style-013">
+              <div class="tSectionLbl">Global Settings</div>
+              <div class="tGlobalGrid">
+                <div class="tGItem"><label>Target Year</label><input type="number" class="tInput" id="tYear" placeholder="2026" min="2020" max="2035"/></div>
+              </div>
+              <div class="tGlobalGrid">
+                <div class="tGItem">
+                  <label>Quarter GP Target ($)</label>
+                  <input type="number" class="tInput" id="tQuarter" placeholder="Auto from months"/>
+                  <div class="tCalcNote" id="qAutoNote"></div>
+                </div>
+                <div class="tGItem">
+                  <label>Annual GP Target ($)</label>
+                  <input type="number" class="tInput" id="tAnnual" placeholder="Auto from months"/>
+                  <div class="tCalcNote" id="aAutoNote"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- MONTHLY -->
+            <div class="u-style-013">
+              <div class="tSectionLbl">
+                <span>Monthly Targets</span>
+                <button class="tBulkBtn">📋 Set Full Year at Once</button>
+              </div>
+              <div class="tMonthHeader"><span>Month</span><span>Profit Target ($)</span><span>ROI Target</span></div>
+              <div id="monthlyInputs"></div>
+            </div>
+
+            <!-- PER GAME ROI -->
+            <div class="u-style-013">
+              <div class="tSectionLbl">Per-Game ROI Targets</div>
+              <div class="u-style-033">Leave blank to use the default ROI target (1.20).</div>
+              <div class="gameRoiGrid" id="gameRoiInputs"></div>
+            </div>
+
+            <button class="tSaveBtn">💾 Save All Targets</button>
+            <div id="savedInfo" class="u-style-034"></div>
+          </div>
+
+          <!-- RIGHT: PREVIEW -->
+          <div class="u-style-035">
+            <div class="tCard">
+              <div class="tCardH u-style-036">Live Preview</div>
+              <div class="tCardSub">Updates as you type</div>
+              <div id="targetPreview"></div>
+            </div>
+            <div class="tCard">
+              <div class="tCardH u-style-036">How It Works</div>
+              <div class="u-style-037">
+                <div class="u-style-038">📌 <b class="u-style-039">Monthly Profit Target</b> — drives projected month end, achievement % and required daily profit.</div>
+                <div class="u-style-038">📌 <b class="u-style-039">Monthly ROI Target</b> — shown in monthly table and Target vs Actual chart.</div>
+                <div class="u-style-038">📌 <b class="u-style-039">Per-Game ROI</b> — each game's ROI target, used in the ROI ranking & pill colours.</div>
+                <div class="u-style-038">📌 <b class="u-style-039">Quarter / Annual</b> — manually set or auto-calculated from monthly profit targets.</div>
+                <div>📌 <b class="u-style-039">Auto-calc</b> — leave Quarter/Annual blank to auto-sum from monthly targets.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LTV TAB -->
+  <div class="tabPanel" id="tab-ltv">
+    <div class="main">
+      <!-- Filters -->
+      <div class="ltvBar">
+        <!-- Platform tabs: Android / iOS only (no "All") -->
+        <span class="lbLbl">Platform</span>
+        <div class="ltvTypeToggle" id="ltvPlatToggle">
+          <button class="on" data-ltv-plat="Android">Android</button>
+          <button data-ltv-plat="iOS">iOS</button>
+        </div>
+        <span class="tsep u-style-040"></span>
+        <span class="lbLbl">LTV Type</span>
+        <div class="ltvTypeToggle" id="ltvTypeToggle">
+          <button class="on" data-ltv-type="Total LTV">Total</button>
+          <button data-ltv-type="Ad LTV">Ad</button>
+          <button data-ltv-type="IAP LTV">IAP</button>
+        </div>
+        <span class="tsep u-style-040"></span>
+        <!-- Game: no "All" — defaults to the (only/first) game -->
+        <select class="fsel" id="ltvGame"></select>
+        <select class="fsel" id="ltvCountry"><option value="">🌍 All Countries</option></select>
+        <span class="tsep u-style-040"></span>
+        <!-- Install-date range presets — default to 90d -->
+        <span class="lbLbl">Range</span>
+        <div class="ltvTypeToggle" id="ltvDateToggle">
+          <button data-ltv-days="7">Last 7d</button>
+          <button data-ltv-days="28">Last 28d</button>
+          <button data-ltv-days="45">Last 45d</button>
+          <button class="on" data-ltv-days="90">Last 90d</button>
+          <button data-ltv-days="0">All</button>
+        </div>
+        <input type="date" class="fsel" id="ltvFrom" title="Custom from (install date)"/>
+        <input type="date" class="fsel" id="ltvTo" title="Custom to (install date)"/>
+        <div class="ltvDayToggle">
+          <button class="on" data-ltv-range="standard">Through D30</button>
+          <button data-ltv-range="extended">Show D40–D50</button>
+        </div>
+      </div>
+
+      <!-- KPI strip -->
+      <div class="ltvKpis" id="ltvKpis">
+        <div class="ltvLoading u-style-041">Loading LTV data…</div>
+      </div>
+
+      <!-- LTV curves chart -->
+      <div class="card u-style-042">
+        <div class="cardHead">
+          <span>LTV Cumulative Curves</span>
+          <span class="u-style-043">Avg LTV per install · click any day below to show/hide it on the chart</span>
+        </div>
+        <!-- Day chips: each chip toggles whether that day appears in the chart.
+             Default = key milestones (D7, D14, D30) on, others off. -->
+        <div class="ltvDayChips" id="ltvDayChips"></div>
+        <div class="u-style-044"><canvas id="ltvCurveChart"></canvas></div>
+      </div>
+
+      <!-- LTV Forecast — dedicated projection chart (D0 → D28/D30) -->
+      <div class="card u-style-042">
+        <div class="cardHead">
+          <span>LTV Forecast · D0 → target</span>
+          <span class="u-style-043">Projected cumulative LTV — historical scaling, curve-fit fallback</span>
+        </div>
+        <div class="ltvDayChips" id="ltvFcBar"></div>
+        <div class="u-style-014"><canvas id="ltvFcChart"></canvas></div>
+      </div>
+
+      <!-- Performance Trends — date-wise trend of a chosen cohort day -->
+      <div class="card u-style-042">
+        <div class="cardHead">
+          <span>Performance Trends</span>
+          <span class="u-style-043">How a single cohort day's LTV changes across install dates</span>
+        </div>
+        <div class="ltvPerfBar">
+          <span class="lbLbl">Period</span>
+          <select class="fsel" id="ltvPerfPeriod">
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly avg</option>
+            <option value="monthly">Monthly avg</option>
+          </select>
+          <span class="lbLbl u-style-045">Cohort Day</span>
+          <select class="fsel" id="ltvPerfDay">
+            <!-- populated from JS so it stays in sync with day list -->
+          </select>
+        </div>
+        <div class="u-style-046"><canvas id="ltvPerfChart"></canvas></div>
+      </div>
+
+      <!-- Cohort heatmap -->
+      <div class="card u-style-042">
+        <div class="cardHead">
+          <span>Cohort Heatmap</span>
+          <span class="u-style-043">Each row = install date · cell color shows LTV intensity within column</span>
+        </div>
+        <div class="heatmapWrap" id="ltvHeatmapWrap">
+          <div class="ltvLoading">Loading heatmap…</div>
+        </div>
+      </div>
+
+      <!-- Game leaderboard -->
+      <div class="card">
+        <div class="cardHead">
+          <span>Game Leaderboard</span>
+          <span class="u-style-043">Sorted by D30 by default · click any column to re-sort</span>
+        </div>
+        <div class="u-style-047"><table class="ltvLead" id="ltvLeadTable"></table></div>
+        <button class="ltvShowAll u-style-010" id="ltvShowAllBtn">Show all</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /app -->
+
+<script src="js/utils.js"></script>
+<script src="js/targets.js"></script>
+<script src="js/login.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/users.js"></script>
+<script src="js/ltv.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
