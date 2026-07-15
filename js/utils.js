@@ -1,19 +1,8 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    UTILS — DEFINED FIRST
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-const domCache = Object.create(null);
-function g(id) {
-  const cached = domCache[id];
-  if(cached && cached.isConnected) return cached;
-  const el = document.getElementById(id);
-  if(el) domCache[id] = el;
-  else delete domCache[id];
-  return el;
-}
-const v  = id => {
-  const el = g(id);
-  return el ? el.value.trim() : '';
-};
+═══════════════════════════════════════════════ */
+const g  = id => document.getElementById(id);
+const v  = id => g(id) ? g(id).value.trim() : '';
 const fm  = n => '$' + Math.abs(Math.round(n)).toLocaleString();
 const fmK = n => { const a=Math.abs(n); return(n<0?'-':'')+(a>=1e6?'$'+(a/1e6).toFixed(2)+'M':a>=1e3?'$'+(a/1e3).toFixed(1)+'K':'$'+Math.round(a)); };
 // Full number with commas — for KPI cards
@@ -22,73 +11,23 @@ const fr2 = n => (+n).toFixed(2);
 const gc  = () => isLight ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,.055)';
 const tc  = () => isLight ? '#4d6080' : '#7a8fad';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const staticDom = {
-  tabPanels: [],
-  tabButtons: [],
-  presetButtons: [],
-  qPills: [],
-  ltvTypeButtons: [],
-  ltvPlatButtons: [],
-  ltvDateButtons: [],
-  ltvRangeButtons: []
-};
-function cacheStaticDom() {
-  staticDom.tabPanels = Array.from(document.querySelectorAll('.tabPanel'));
-  staticDom.tabButtons = Array.from(document.querySelectorAll('.tabBtn'));
-  staticDom.presetButtons = Array.from(document.querySelectorAll('.presetBtn'));
-  staticDom.qPills = Array.from(document.querySelectorAll('.qPill'));
-  staticDom.ltvTypeButtons = Array.from(document.querySelectorAll('#ltvTypeToggle button'));
-  staticDom.ltvPlatButtons = Array.from(document.querySelectorAll('#ltvPlatToggle button'));
-  staticDom.ltvDateButtons = Array.from(document.querySelectorAll('#ltvDateToggle button'));
-  staticDom.ltvRangeButtons = Array.from(document.querySelectorAll('.ltvDayToggle button'));
-}
-function cachedList(name, selector) {
-  return staticDom[name]?.length ? staticDom[name] : Array.from(document.querySelectorAll(selector));
-}
-function escapeHTML(value) {
-  return String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[ch]));
-}
-const escapeAttr = escapeHTML;
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    CONFIG
    ▸ Only the deployment URL lives in the browser now.
    ▸ The SECRET_KEY stays on the server (Apps Script) and is NEVER
      shipped to the client — auth happens via short-lived login tokens
      stored in sessionStorage.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxCjLA9EUPcWINARcKj2Iv7kBef9fCGHNC8nb-bBXT2_lmwEgrfXMelkbjLFhcTCcUa/exec';
 
-function ensureChartFallback() {
-  if(window.Chart) return;
-  console.warn('Chart.js did not load. Charts will be skipped until the library is available.');
-  window.Chart = class MissingChart {
-    static register() {}
-    constructor() {
-      this.data = { labels: [], datasets: [] };
-      this.options = {};
-      this._missingLibrary = true;
-    }
-    destroy() {}
-    update() {}
-  };
-  window.Chart.__missingLibrary = true;
-}
-ensureChartFallback();
-
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    SECURITY CONFIG
    ▸ Add/remove Gmail addresses in ALLOWED_EMAILS
    ▸ Each entry: { email, name, password, role }
    ▸ Passwords are stored as SHA-256 hashes
    ▸ To generate a hash: open browser console → hashPwd('yourpassword')
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 
 // ── SHA-256 hashing (Web Crypto API) ──
 async function hashPwd(pwd) {
@@ -101,11 +40,11 @@ const SESSION_HOURS   = 8;
 const MAX_ATTEMPTS    = 5;
 const LOCKOUT_MINUTES = 15;
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    AUTH — Users stored in Google Sheet (DashUsers tab)
    All auth requests go to Apps Script
    Browser only stores: session token + user info
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 
 // ── Session helpers (token-based) ──
 function createSession(user, token) {
@@ -157,11 +96,11 @@ async function apiFetch(params) {
 }
 
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    STATE
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 let CU=null, isLight=false;
-let rawData=[], filteredData=[], prevPeriodData=[], roasData=[];
+let rawData=[], filteredData=[], prevPeriodData=[];
 let refreshTimer=null, lastRefresh=null;
 let charts={};
 let currentPreset='28d';
@@ -180,14 +119,10 @@ window._dataLastDate = (()=>{const d=new Date();d.setDate(d.getDate()-1);d.setHo
 function dataNow(){ const d=new Date(); d.setDate(d.getDate()-1); d.setHours(0,0,0,0); return d; }
 
 
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    UTILS
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-function showLoader(on,txt='Loading…'){
-  const loader=g('loader'), loaderTxt=g('loaderTxt');
-  loader.classList.toggle('on',on);
-  if(txt) loaderTxt.textContent=txt;
-}
+═══════════════════════════════════════════════ */
+function showLoader(on,txt='Loading…'){g('loader').classList.toggle('on',on);if(txt)g('loaderTxt').textContent=txt;}
 let toastT=null;
 function toast(msg,type='ok'){
   const el=g('toast');el.textContent=msg;
