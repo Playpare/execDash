@@ -1,6 +1,6 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+/* ═══════════════════════════════════════════════
    LOGIN / LOGOUT
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+═══════════════════════════════════════════════ */
 // ── Login button loading state ──
 function setLoginLoading(loading) {
   const btn = document.querySelector('.loginBtn');
@@ -111,7 +111,7 @@ function showFileProtocolWarning() {
   div.id = 'fileProtoWarning';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:#0d1f35;border:1px solid #1e3a5f;border-radius:12px;padding:28px;max-width:480px;width:100%">
-    <div style="font-size:20px;font-weight:700;color:#00e5c3;margin-bottom:6px">âš ï¸ Server Not Running</div>
+    <div style="font-size:20px;font-weight:700;color:#00e5c3;margin-bottom:6px">⚠️ Server Not Running</div>
     <div style="font-size:13px;color:#7a8fad;margin-bottom:18px">This file is opened via the <code style="color:#ffb800">file://</code> protocol — due to browser security it cannot connect to the login server.</div>
     <div style="font-size:13px;font-weight:600;color:#b0c4de;margin-bottom:10px">What to do:</div>
     <div style="background:#0a1628;border-radius:8px;padding:14px;font-size:12px;color:#7a8fad;line-height:1.8">
@@ -124,9 +124,9 @@ function showFileProtocolWarning() {
       <code style="color:#ffb800">python -m http.server 8080</code><br>
       Then open: <code style="color:#ffb800">http://localhost:8080</code><br><br>
       <b style="color:#00e5c3">Option 3 — Netlify Drop:</b><br>
-      Drag the file onto <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer" style="color:#4d9fff">app.netlify.com/drop</a> — free hosting
+      Drag the file onto <a href="https://app.netlify.com/drop" target="_blank" style="color:#4d9fff">app.netlify.com/drop</a> — free hosting
     </div>
-    <button data-close-file-warning
+    <button onclick="this.parentElement.parentElement.style.display='none'"
       style="margin-top:16px;width:100%;padding:10px;background:#00e5c3;color:#020d1a;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">
       Got it ✓
     </button>
@@ -154,6 +154,7 @@ function loginSuccess(user) {
   }
   setupAutoRefresh();
   loadData();
+  loadRoasData();
 }
 
 // ── Check existing session on page load ──
