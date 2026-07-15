@@ -231,14 +231,9 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
 /* Gauge detail strip below arc */
 .gDetail{display:flex;justify-content:space-between;align-items:center;margin-top:3px;padding:6px 8px;background:var(--card2);border-radius:var(--rs);border:1px solid var(--border);width:100%}
 .gDetailItem{text-align:center}
-.gYearOnly{display:none}
-.gDetail.yearView{gap:8px}
-.gDetail.yearView .gDetailItem{flex:1;min-width:0}
-.gDetail.yearView .gYearOnly{display:block}
-.gDetail.yearView .gDetailLbl{line-height:1.2}
 .gDetailLbl{font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:2px}
 .gDetailVal{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:var(--t1)}
-.gDetailVal.pos{color:var(--green)}.gDetailVal.neg{color:var(--coral)}.gDetailVal.hi{color:var(--teal)}
+.gDetailVal.pos{color:var(--green)}.gDetailVal.neg{color:var(--coral)}.gDetailVal.hi{color:var(--teal)}.gDetailVal.amb{color:var(--amber)}
 /* Month filter pill */
 .monthFilter{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap}
 .monthPill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--t2);transition:all .2s;white-space:nowrap}
@@ -294,9 +289,8 @@ body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-we
 .targetsGrid{display:grid;grid-template-columns:1fr 360px;gap:18px;margin-bottom:18px}
 @media(max-width:1100px){.targetsGrid{grid-template-columns:1fr}}
 .tCard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:22px;box-shadow:var(--shs)}
-.tCardH{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;line-height:1.2;letter-spacing:-.01em;color:var(--t1);margin-bottom:8px}
-.tCardSub{font-size:13px;line-height:1.55;font-weight:500;color:var(--t2);margin-bottom:22px;max-width:560px}
-.bModalSub{font-size:12px;color:var(--t2);margin-bottom:20px}
+.tCardH{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:4px}
+.tCardSub,.bModalSub{font-size:12px;color:var(--t2);margin-bottom:20px}
 .tSectionLbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
 .tGlobalGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
 .tGItem label{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t2);display:block;margin-bottom:5px}
