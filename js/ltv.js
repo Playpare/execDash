@@ -1,877 +1,525 @@
-/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   LTV TAB
-   ─ Data lives in a different spreadsheet, exposed via
-     same Apps Script as ?action=ltv (so auth + URL reuse).
-   ─ Each cohort row has 3 LTV types (Ad / IAP / Total).
-   ─ Default chart/table = D0..D30. Toggle reveals D40/D45/D50.
-â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
-const LTV_DAYS_STD = ['D0','D1','D3','D7','D14','D21','D28','D30'];
-const LTV_DAYS_EXT = ['D0','D1','D3','D7','D14','D21','D28','D30','D40','D45','D50'];
-// Days that the cumulative-curves chart starts with (other days are
-// optional — user toggles them via the chip row). Key milestones default on.
-const LTV_DAYS_DEFAULT_VISIBLE = ['D0','D7','D14','D30'];
-let   ltvData = null;       // raw rows from Apps Script
+:root{
+  --bg:#000000;--bg2:#080a0e;--card:#0b0c0f;--card2:#070809;
+  --glass:rgba(9,10,13,.9);--border:rgba(255,255,255,.08);--borderB:rgba(255,255,255,.14);
+  --t1:#edf2ff;--t2:#7a8fad;--t3:#3d5070;
+  --teal:#00e5c3;--tealD:rgba(0,229,195,.14);
+  --blue:#4d9fff;--blueD:rgba(77,159,255,.14);
+  --amber:#ffb800;--amberD:rgba(255,184,0,.14);
+  --coral:#ff4d6d;--coralD:rgba(255,77,109,.14);
+  --green:#00c47a;--greenD:rgba(0,196,122,.14);
+  --rev:#4d9fff;--spd:#ff4d6d;--pro:#00e5c3;--roi:#ffb800;
+  --r:14px;--rs:8px;
+  --sh:0 8px 40px rgba(0,0,0,.6);--shs:0 3px 16px rgba(0,0,0,.4);
+}
+.lt{
+  /* Refined light theme: cool-neutral canvas, crisp white cards, soft layered
+     blue-grey shadows for depth, and a slightly deeper teal so accents read
+     well on white. */
+  --bg:#eef1f7;--bg2:#e3e8f2;--card:#ffffff;--card2:#f5f7fc;
+  --glass:rgba(255,255,255,.82);--border:rgba(15,30,60,.09);--borderB:rgba(15,30,60,.16);
+  --t1:#0d1b2e;--t2:#56657f;--t3:#94a3ba;
+  --teal:#00b39a;--tealD:rgba(0,179,154,.12);
+  --blueD:rgba(77,159,255,.12);
+  --sh:0 10px 34px rgba(30,50,90,.12);--shs:0 2px 10px rgba(30,50,90,.07);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Poppins',sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;transition:background .3s,color .3s;overflow-x:hidden;-webkit-text-size-adjust:100%}
+.orb{position:fixed;border-radius:50%;filter:blur(100px);pointer-events:none;z-index:0;animation:drift 20s ease-in-out infinite alternate}
+.o1{width:600px;height:600px;background:radial-gradient(circle,rgba(0,229,195,.2),transparent 70%);top:-150px;left:-100px;opacity:.38}
+.o2{width:500px;height:500px;background:radial-gradient(circle,rgba(77,159,255,.18),transparent 70%);bottom:-100px;right:-80px;opacity:.32;animation-delay:-9s}
+.o3{width:350px;height:350px;background:radial-gradient(circle,rgba(255,184,0,.13),transparent 70%);top:45%;left:55%;opacity:.28;animation-delay:-5s}
+@keyframes drift{0%{transform:translate(0,0) scale(1)}100%{transform:translate(28px,18px) scale(1.05)}}
+.lt .orb{opacity:.08!important}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-// â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
-// │  LTV GAME FILTER TOGGLE                                            │
-// │  Set to  true  to bring back the per-game dropdown in the LTV bar. │
-// │  (Off = all games blended together, no game selector shown.)       │
-// └──────────────────────────────────────────────────────────────────┘
-const LTV_SHOW_GAME = false;
+/* ── LOGIN ── */
+#loginScreen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;overflow:hidden}
+/* faint dot-grid texture so the backdrop isn't dead-flat */
+#loginScreen{background-image:radial-gradient(rgba(255,255,255,.028) 1px,transparent 1px);background-size:26px 26px}
+body.lt #loginScreen{background-image:radial-gradient(rgba(0,0,0,.035) 1px,transparent 1px)}
+/* two soft brand-colour orbs drifting behind the card → depth */
+#loginScreen::before,#loginScreen::after{content:'';position:absolute;border-radius:50%;filter:blur(70px);z-index:0;pointer-events:none}
+#loginScreen::before{width:420px;height:420px;background:radial-gradient(circle,rgba(0,229,195,.22),transparent 70%);top:-120px;left:-100px;animation:psOrb1 14s ease-in-out infinite}
+#loginScreen::after{width:480px;height:480px;background:radial-gradient(circle,rgba(77,159,255,.20),transparent 70%);bottom:-150px;right:-120px;animation:psOrb2 16s ease-in-out infinite}
+@keyframes psOrb1{0%,100%{transform:translate(0,0)}50%{transform:translate(60px,40px)}}
+@keyframes psOrb2{0%,100%{transform:translate(0,0)}50%{transform:translate(-50px,-30px)}}
+.loginCard{position:relative;z-index:1;background:var(--glass);border:1px solid var(--borderB);backdrop-filter:blur(28px);border-radius:24px;padding:50px 44px;width:430px;box-shadow:var(--sh);animation:fadeUp .6s cubic-bezier(.4,0,.2,1) both}
+/* teal→blue hairline accent across the top of the card */
+.loginCard::before{content:'';position:absolute;top:0;left:26px;right:26px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,var(--teal),var(--blue),transparent);opacity:.85}
+.loginLogo{width:54px;height:54px;border-radius:16px;margin:0 auto 18px;background:linear-gradient(135deg,var(--teal),var(--blue));display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 0 32px rgba(0,229,195,.28)}
+.loginH{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;text-align:center;margin-bottom:5px;letter-spacing:.005em;color:var(--t1)}
+/* subtle white→steel chrome gradient (dark theme only — stays readable on light) */
+body:not(.lt) .loginH{background:linear-gradient(180deg,#ffffff 30%,#9fb4d6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.loginSub{font-size:13px;color:var(--t2);text-align:center;margin-bottom:30px}
+.lf{margin-bottom:15px}
+.lf label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);display:block;margin-bottom:6px}
+.lInputWrap{position:relative}
+.lInputWrap .lIcon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.55;pointer-events:none;line-height:1}
+.lInputWrap .lEye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--t2);cursor:pointer;font-size:15px;opacity:.5;padding:5px;line-height:1;transition:opacity .15s}
+.lInputWrap .lEye:hover{opacity:1}
+.lf input{width:100%;padding:12px 14px 12px 40px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--t1);font-family:'Poppins',sans-serif;font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
+#lPass{padding-right:42px}
+.lf input:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(0,229,195,.12)}
+.lf input::placeholder{color:var(--t3)}
+/* keep autofilled fields on the dark card colour (fixes the light email box) */
+.lf input:-webkit-autofill,.lf input:-webkit-autofill:hover,.lf input:-webkit-autofill:focus,.lf input:-webkit-autofill:active{
+  -webkit-text-fill-color:var(--t1);
+  -webkit-box-shadow:0 0 0 1000px var(--card) inset;
+  box-shadow:0 0 0 1000px var(--card) inset;
+  caret-color:var(--t1);
+  transition:background-color 9999s ease-out 0s}
+/* hide the browser's native password reveal — we have our own eye toggle */
+#lPass::-ms-reveal,#lPass::-ms-clear{display:none}
+.loginBtn{width:100%;padding:13px;margin-top:8px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#020d1a;border:none;border-radius:var(--rs);font-family:'Poppins',sans-serif;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.02em;box-shadow:0 4px 22px rgba(0,229,195,.26);transition:transform .18s,box-shadow .2s,opacity .2s}
+.loginBtn:hover{transform:translateY(-1px);box-shadow:0 7px 30px rgba(0,229,195,.42)}
+.loginBtn:active{transform:translateY(0);opacity:.92}
+.loginBtn:disabled{opacity:.6;cursor:default;transform:none}
+.loginErr{color:var(--coral);font-size:13px;text-align:center;margin-top:10px;display:none;font-weight:500}
+.demoBox{margin-top:22px;padding-top:18px;border-top:1px solid var(--border)}
+.demoBox p{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t3);margin-bottom:8px}
+.demoRow{display:flex;align-items:center;gap:8px;padding:7px 11px;background:var(--card2);border-radius:var(--rs);margin-bottom:5px;border:1px solid var(--border)}
+.dTag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.05em;text-transform:uppercase}
+.dAdmin{background:var(--tealD);color:var(--teal)}
+.dViewer{background:var(--blueD);color:var(--blue)}
+.dCred{font-family:'DM Mono',monospace;font-size:12px;color:var(--t2)}
 
-let   ltvFilters = { type:'Total LTV', game:'', plat:'Android', country:'', from:'', to:'', range:'standard', rangeDays:90 };
-let   ltvVisibleDays = new Set(LTV_DAYS_DEFAULT_VISIBLE);
-let   ltvPerfDay = 'D28';    // selected day for Performance Trends
-let   ltvPerfPeriod = 'daily';
-let   ltvLeadSort = { col:'D30', dir:'desc' };
-let   ltvShowAll  = false;
-let   _ltvLoaded  = false;
-// ── LTV forecasting (hybrid: historical scaling → power-law fallback) ──
-let   ltvForecastOn     = true;
-let   ltvForecastTarget = 'D30';   // 'D28' | 'D30'
+/* ── APP SHELL ── */
+#app{display:none;position:relative;z-index:1;min-height:100vh}
 
-// Parse "PS_Android_My Supermarket Simulator" -> { plat:'Android', game:'My Supermarket Simulator' }
-function parseAppName(s){
-  s = String(s || '').trim();
-  // Common shapes: PS_Android_..., PS_iOS_..., PS_IOS_...
-  const m = s.match(/^PS_(Android|iOS|IOS|ios|android)_(.*)$/i);
-  if(m) return { plat: m[1].toLowerCase()==='android' ? 'Android' : 'iOS', game: m[2].trim() };
-  return { plat: '', game: s };
+/* ── TOPBAR ── */
+.topbar{position:sticky;top:0;z-index:500;background:var(--glass);backdrop-filter:blur(22px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:12px;height:60px}
+.brand{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.brandIcon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--teal),var(--blue));display:flex;align-items:center;justify-content:center;font-size:15px}
+.brandName{font-family:'Quicksand',sans-serif;font-size:18px;font-weight:700;letter-spacing:.01em;color:var(--t1)}
+.tsep{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.tabNav{display:flex;gap:2px;background:var(--card2);border:1px solid var(--border);border-radius:var(--rs);padding:3px;flex-shrink:0}
+.tabBtn{padding:5px 16px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;border:none;background:transparent;color:var(--t2);transition:all .2s;white-space:nowrap}
+.tabBtn.active{background:linear-gradient(135deg,var(--teal),var(--blue));color:#020d1a;box-shadow:0 2px 10px rgba(0,229,195,.22)}
+.tabBtn:hover:not(.active){color:var(--t1);background:rgba(255,255,255,.05)}
+.topRight{display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0;flex-wrap:wrap}
+.tbtn{background:var(--card);border:1.5px solid var(--border);color:var(--t1);padding:0 12px;height:32px;border-radius:var(--rs);font-family:'Poppins',sans-serif;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s;display:flex;align-items:center;gap:5px}
+.tbtn:hover{background:var(--card2);border-color:var(--borderB)}
+.tbtn.primary{background:var(--teal);color:#020d1a;border-color:var(--teal);font-weight:700}
+.tbtn.primary:hover{opacity:.85}
+.rolePill{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.rAdmin{background:var(--tealD);color:var(--teal);border:1px solid rgba(0,229,195,.25)}
+.rViewer{background:var(--blueD);color:var(--blue);border:1px solid rgba(77,159,255,.25)}
+.uname{font-size:12px;font-weight:600;color:var(--t2)}
+.alertBadge{display:none;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;background:var(--coralD);border:1px solid rgba(255,77,109,.28);color:var(--coral);font-size:11px;font-weight:700;cursor:pointer;animation:pulse 2s infinite}
+.alertBadge.show{display:flex}
+.refreshInfo{font-size:11px;color:var(--t3);white-space:nowrap}
+
+/* ── DATE PRESETS / DASHBOARD FILTER BAR ──
+   Boxed + sticky to match the LTV tab's filter bar.
+   `top` value matches the topbar height so the bar stops just below it. */
+.dateBar,.ltvBar{background:var(--card2);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px;position:sticky;top:60px;z-index:100;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.lt .dateBar,.lt .ltvBar{box-shadow:0 4px 14px rgba(0,0,0,.06)}
+.presetBtn{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--t2);transition:all .2s;white-space:nowrap}
+.presetBtn:hover{border-color:var(--teal);color:var(--teal)}
+.presetBtn.active{background:var(--tealD);border-color:var(--teal);color:var(--teal)}
+.dateInputWrap{display:flex;align-items:center;gap:6px;margin-left:auto}
+.dateInputWrap label{font-size:11px;color:var(--t3);font-weight:500}
+.fsel{background:var(--card);border:1.5px solid var(--border);color:var(--t1);padding:5px 9px;border-radius:var(--rs);font-family:'Poppins',sans-serif;font-size:12px;outline:none;cursor:pointer;height:30px;transition:border-color .2s}
+.fsel:focus{border-color:var(--teal)}
+.fsel[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5)}
+.filterSelects{display:flex;gap:6px}
+
+/* ── MAIN ── */
+.main{padding:20px 24px;max-width:1800px;margin:0 auto;width:100%}
+.tabPanel{display:none;animation:fadeIn .3s ease}
+.tabPanel.active{display:block}
+
+/* ── CARDS ── */
+.card,.projCard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--shs)}
+.cardHead{font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t2);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.secTitle{font-family:'Syne',sans-serif;font-size:17px;font-weight:800;color:var(--t1);margin:22px 0 14px;letter-spacing:-.01em;display:flex;align-items:center;gap:10px}
+.secTitle::after{content:'';flex:1;height:1px;background:var(--border)}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.g3{display:grid;grid-template-columns:1fr 1fr 2.2fr;gap:14px;margin-bottom:18px}
+.g2,.roasGrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+/* ── RESPONSIVE ── */
+@media(max-width:1400px){
+  .g3{grid-template-columns:1fr 1fr}
+}
+@media(max-width:900px){
+  .g4{grid-template-columns:repeat(2,1fr)}
+  .g2,.roasGrid{grid-template-columns:1fr}
+  .g3{grid-template-columns:1fr}
+  .topbar{flex-wrap:wrap;height:auto;padding:8px 16px;gap:8px}
+  .topRight{flex-wrap:wrap;gap:4px}
+  .tbtn{height:28px;padding:0 8px;font-size:11px}
+  .dateBar{padding:6px 12px;gap:6px}
+  .main{padding:12px 14px}
+}
+@media(max-width:640px){
+  .g4{grid-template-columns:1fr 1fr}
+  .topbar{padding:6px 12px}
+  .brandName{font-size:14px}
+  .tabBtn{padding:4px 10px;font-size:11px}
+  .kpiVal{font-size:clamp(13px,4vw,18px)!important}
+  .dateBar{gap:4px}
+  .presetBtn{padding:3px 8px;font-size:10px}
+}
+@media(max-width:480px){
+  .g4{grid-template-columns:1fr}
+  .topRight .uname,.topRight .rolePill,.topRight .refreshInfo{display:none}
 }
 
-// Sheet has an "All" / "All Countries" row that's the team's pre-aggregated
-// total (because we deliberately don't pull every country to stay under
-// API limits). Treat that row as the dropdown's default "All Countries"
-// option — don't surface it as a separate selectable country.
-function isAllCountry(s){
-  return /^all(\s*countries?)?$/i.test(String(s||'').trim());
+/* ── KPI CARDS ── */
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px 12px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;animation:fadeUp .5s ease both;display:flex;flex-direction:column;gap:0}
+.kpiMain{display:flex;align-items:stretch;gap:0;flex:1;min-height:62px}
+.kpiFoot{display:flex;justify-content:space-between;align-items:center;margin-top:11px;padding-top:9px;border-top:1px dashed var(--border)}
+.kpiFootLbl{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t3)}
+.kpiFootVal{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--t1)}
+.kpi:nth-child(1){animation-delay:.05s}.kpi:nth-child(2){animation-delay:.1s}.kpi:nth-child(3){animation-delay:.15s}.kpi:nth-child(4){animation-delay:.2s}
+.kpi:hover,.ltvKpi:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--kc,var(--teal));z-index:3}
+.kpiText{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;z-index:2}
+.kpiLbl,.ltvKpi .kpiLbl{font-size:10px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--t2);margin-bottom:8px}
+.kpiVal{font-family:'DM Mono',monospace;font-size:clamp(16px,1.6vw,22px);font-weight:500;color:var(--kc,var(--teal));line-height:1;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpiBottom{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kpiChg{font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px}
+.kpiPrev{font-size:10px;color:var(--t3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.up,.ltvGrowth.up{background:rgba(0,196,122,.1);color:var(--green)}.dn,.ltvGrowth.dn{background:rgba(255,77,109,.1);color:var(--coral)}.neu{background:var(--border);color:var(--t2)}
+.kpiSparkBox{width:42%;flex-shrink:0;position:relative;overflow:hidden;border-radius:0 var(--rs) var(--rs) 0}
+.kpiSpark{position:absolute;inset:0;width:100%!important;height:100%!important;pointer-events:auto}
+.kRev{--kc:var(--rev)}.kSpd{--kc:var(--spd)}.kPro{--kc:var(--pro)}.kRoi{--kc:var(--roi)}
+
+/* ── ALERT PANEL ── */
+.alertPanel{background:var(--coralD);border:1px solid rgba(255,77,109,.22);border-radius:var(--r);padding:14px 18px;margin-bottom:16px;display:none}
+.alertPanel.show{display:block}
+.alertPanelTitle{font-size:11px;font-weight:700;color:var(--coral);margin-bottom:8px;letter-spacing:.06em;text-transform:uppercase}
+.alertItem{font-size:12px;color:var(--t1);padding:5px 0;border-bottom:1px solid rgba(255,77,109,.12);display:flex;gap:8px;align-items:center}
+.alertItem:last-child{border-bottom:none}
+
+/* ── PROJECTED ── */
+.projHeader{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.projBig{font-family:'DM Mono',monospace;font-size:26px;font-weight:500;color:var(--teal)}
+.projTarget{font-size:11px;color:var(--t3);font-weight:500;margin-top:2px}
+.projBadge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.projExceeded{background:rgba(0,196,122,.15);color:var(--green);border:1px solid rgba(0,196,122,.3)}
+.projBehind{background:var(--amberD);color:var(--amber);border:1px solid rgba(255,184,0,.3)}
+.projOntrack{background:var(--tealD);color:var(--teal);border:1px solid rgba(0,229,195,.3)}
+.projOff{background:var(--coralD);color:var(--coral);border:1px solid rgba(255,77,109,.3)}
+.barWrap{margin:12px 0;position:relative}
+.barTrack{height:10px;background:var(--border);border-radius:99px;overflow:visible;position:relative}
+.barFill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal),var(--blue));transition:width 1.4s cubic-bezier(.4,0,.2,1);position:relative}
+.barMarker{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--amber);border-radius:99px}
+/* Target sits at the far-right (left:100%); anchor its label's RIGHT edge to the
+   marker so the value stays inside the card instead of overflowing off-screen. */
+.barMarkerLabel{position:absolute;top:-18px;right:0;left:auto;transform:none;font-size:9px;font-weight:700;color:var(--amber);white-space:nowrap}
+.barPct{font-size:12px;font-weight:700;color:var(--t2);margin-top:5px;text-align:right}
+.metGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.metItem{background:var(--card2);border:1px solid var(--border);border-radius:var(--rs);padding:10px 12px}
+.metLbl{font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);margin-bottom:4px}
+.metVal{font-family:'DM Mono',monospace;font-size:16px;font-weight:500;color:var(--t1)}
+.metVal.good{color:var(--teal)}.metVal.bad{color:var(--coral)}.metVal.warn{color:var(--amber)}
+
+/* ── GAUGES ── */
+.gaugeSection{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px 14px;box-shadow:var(--shs);display:flex;flex-direction:column;align-items:center;gap:2px;overflow:hidden}
+.gaugeWrap{text-align:center;width:100%}
+.gaugeTitle{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);margin-bottom:4px}
+.gaugeRel{display:block;width:100%;text-align:center;line-height:0}
+.gaugeInfo{text-align:center;margin-top:-10px;padding-bottom:2px}
+.gPct{font-family:'DM Mono',monospace;font-size:17px;font-weight:700;color:var(--teal);white-space:nowrap}
+.gSub{font-size:9px;color:var(--t3);margin-top:1px}
+.gAmt{font-size:10px;color:var(--t2);font-weight:600;margin-top:2px}
+.gaugeDivider{height:1px;background:var(--border);margin:4px 10px}
+/* Gauge detail strip below arc */
+.gDetail{display:flex;justify-content:space-between;align-items:center;margin-top:3px;padding:6px 8px;background:var(--card2);border-radius:var(--rs);border:1px solid var(--border);width:100%}
+.gDetailItem{text-align:center}
+.gDetailLbl{font-size:8px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--t3);margin-bottom:2px}
+.gDetailVal{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;color:var(--t1)}
+.gDetailVal.pos{color:var(--green)}.gDetailVal.neg{color:var(--coral)}.gDetailVal.hi{color:var(--teal)}.gDetailVal.amb{color:var(--amber)}
+/* Month filter pill */
+.monthFilter{display:flex;align-items:center;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.monthPill{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;font-family:'Poppins',sans-serif;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--t2);transition:all .2s;white-space:nowrap}
+.monthPill:hover{border-color:var(--teal);color:var(--teal)}
+.monthPill.active{background:var(--tealD);border-color:var(--teal);color:var(--teal)}
+/* Quarter filter */
+.qFilter{display:flex;gap:4px;margin-bottom:6px}
+.qPill{padding:3px 12px;border-radius:20px;font-size:11px;font-weight:700;font-family:'Poppins',sans-serif;cursor:pointer;border:1.5px solid var(--border);background:transparent;color:var(--t2);transition:all .2s}
+.qPill:hover{border-color:var(--amber);color:var(--amber)}
+.qPill.active{background:var(--amberD);border-color:var(--amber);color:var(--amber)}
+/* Smart projection badge */
+.smartBadge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;color:var(--amber);background:var(--amberD);border:1px solid rgba(255,184,0,.25);border-radius:20px;padding:2px 8px}
+
+/* ── MONTHLY TABLE ── */
+.mTable{width:100%;border-collapse:collapse;font-size:11px}
+.mTable th{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--t3);padding:7px 9px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap}
+.mTable td{padding:7px 9px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;font-size:11px;color:var(--t2);white-space:nowrap}
+.mTable tr:last-child td{border-bottom:none}
+.mTable tbody tr:hover td{background:var(--card2);color:var(--t1)}
+.mTable td.nameCol{font-family:'Poppins',sans-serif;font-weight:600;color:var(--t1)}
+.mTable tr.curRow td{background:rgba(0,229,195,.06)}
+.mTable tr.curRow td:first-child{box-shadow:inset 3px 0 0 var(--teal)}
+.mTable tr.curRow:hover td{background:rgba(0,229,195,.1)}
+
+/* Revenue & Profit by Game — horizontal bar list */
+.gbar-list{display:flex;flex-direction:column;gap:1px}
+.gbar-row{display:grid;grid-template-columns:150px 1fr 100px;gap:14px;align-items:center;padding:9px 6px;border-radius:8px;transition:background .15s}
+.gbar-row:hover{background:var(--card2)}
+.gbar-nameWrap{min-width:0}
+.gbar-name{font-size:12px;font-weight:600;color:var(--t1);line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gbar-tag{font-size:8px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3)}
+.gbar-track{position:relative;height:22px;background:rgba(122,143,173,.09);border-radius:5px;overflow:hidden}
+.gbar-fill{position:absolute;top:0;left:0;bottom:0;border-radius:5px;min-width:2px;transition:width .5s ease}
+.gbar-vals{text-align:right}
+.gbar-rev{font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--t1)}
+.gbar-pro{font-size:9px;color:var(--t3);margin-top:1px}
+.gbar-expand{width:100%;margin-top:8px;padding:8px;background:transparent;border:1px dashed var(--border);border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;transition:border-color .15s,color .15s}
+.gbar-expand:hover{border-color:var(--teal);color:var(--teal)}
+.gbar-sub{border-left:2px solid var(--border);margin-left:6px;margin-top:2px}
+.gbar-sub .gbar-row{grid-template-columns:144px 1fr 100px}
+.gbar-sub .gbar-name{font-weight:500;font-size:11px;color:var(--t2)}
+.gbar-sub .gbar-track{height:15px}
+.pill{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;display:inline-block}
+.pillG{background:rgba(0,196,122,.12);color:var(--green)}
+.pillR{background:rgba(255,77,109,.12);color:var(--coral)}
+.pillA{background:var(--amberD);color:var(--amber)}
+.pillN{color:var(--t3)}
+.pillC{background:var(--tealD);color:var(--teal)}
+.deltaPos{color:var(--green);font-weight:700}
+.deltaNeg{color:var(--coral);font-weight:700}
+
+/* ── TARGETS TAB ── */
+.targetsGrid{display:grid;grid-template-columns:1fr 360px;gap:18px;margin-bottom:18px}
+@media(max-width:1100px){.targetsGrid{grid-template-columns:1fr}}
+.tCard{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:22px;box-shadow:var(--shs)}
+.tCardH{font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:4px}
+.tCardSub,.bModalSub{font-size:12px;color:var(--t2);margin-bottom:20px}
+.tSectionLbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t2);margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.tGlobalGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+.tGItem label{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t2);display:block;margin-bottom:5px}
+.tInput{width:100%;padding:9px 11px;background:var(--card2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--t1);font-family:'DM Mono',monospace;font-size:13px;outline:none;transition:border-color .2s;text-align:right}
+.tInput:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(0,229,195,.1)}
+.tInput::placeholder{color:var(--t3)}
+.tCalcNote{font-size:11px;color:var(--teal);margin-top:4px;font-weight:500}
+.tMonthHeader{display:grid;grid-template-columns:72px 1fr 1fr;gap:8px;margin-bottom:6px}
+.tMonthHeader span{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);text-align:right}
+.tMonthHeader span:first-child{text-align:left}
+.tMonthRow{display:grid;grid-template-columns:72px 1fr 1fr;gap:8px;align-items:center;margin-bottom:6px}
+.tMonthLbl{font-size:12px;font-weight:600;color:var(--t2)}
+.tSaveBtn{width:100%;padding:12px;background:linear-gradient(135deg,var(--teal),var(--blue));color:#020d1a;border:none;border-radius:var(--rs);font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 18px rgba(0,229,195,.2);transition:opacity .2s;margin-top:8px}
+.tSaveBtn:hover{opacity:.88}
+.tBulkBtn{padding:5px 12px;border-radius:var(--rs);font-size:11px;font-weight:700;cursor:pointer;border:1.5px solid var(--borderB);background:transparent;color:var(--t2);transition:all .2s;font-family:'Poppins',sans-serif}
+.tBulkBtn:hover{border-color:var(--teal);color:var(--teal)}
+
+/* per-game ROI */
+.gameRoiGrid{display:grid;gap:6px;margin-top:8px}
+.gameRoiRow{display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center}
+.gameRoiName{font-size:12px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* BULK MODAL */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:center;justify-content:center;backdrop-filter:blur(5px)}
+.overlay.open{display:flex}
+.bModal{background:var(--card);border:1px solid var(--borderB);border-radius:20px;width:640px;max-height:88vh;overflow-y:auto;box-shadow:var(--sh);padding:28px;animation:fadeUp .3s ease}
+.bModalH{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.bModalTitle,.uModalTitle{font-family:'Syne',sans-serif;font-size:19px;font-weight:800}
+.bClose{cursor:pointer;font-size:22px;color:var(--t3);transition:color .2s;line-height:1}
+.bClose:hover{color:var(--t1)}
+
+/* USER MODAL */
+.uModal{background:var(--card);border:1px solid var(--borderB);border-radius:20px;width:560px;max-height:85vh;overflow:auto;box-shadow:var(--sh);padding:28px;animation:fadeUp .3s ease}
+.uModalH{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.uClose{cursor:pointer;font-size:22px;color:var(--t3);transition:color .2s;line-height:1}
+.uClose:hover{color:var(--t1)}
+.uTable{width:100%;border-collapse:collapse;margin-bottom:16px}
+.uTable th{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);padding:7px 9px;border-bottom:1px solid var(--border);text-align:left}
+.uTable td{padding:9px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle}
+.uTable tr:last-child td{border-bottom:none}
+.uRoleSel{background:var(--bg);border:1px solid var(--border);color:var(--t1);padding:4px 7px;border-radius:6px;font-size:12px;font-family:'Poppins',sans-serif}
+.uDel{color:var(--coral);cursor:pointer;font-weight:700;border:none;background:none;font-size:14px}
+.addRow{display:flex;gap:7px;flex-wrap:wrap}
+.addRow input,.addRow select{flex:1;min-width:100px;padding:8px 10px;background:var(--bg2);border:1.5px solid var(--border);border-radius:var(--rs);color:var(--t1);font-family:'Poppins',sans-serif;font-size:13px;outline:none;transition:border-color .2s}
+.addRow input:focus,.addRow select:focus{border-color:var(--teal)}
+
+/* LOADER / TOAST */
+.loader{position:fixed;inset:0;z-index:700;background:rgba(7,12,24,.88);backdrop-filter:blur(6px);display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.loader.on{display:flex}
+.spinner{width:42px;height:42px;border-radius:50%;border:3px solid var(--borderB);border-top-color:var(--teal);animation:spin .75s linear infinite}
+.loaderTxt{font-size:14px;color:var(--t2);font-weight:500}
+.toast{position:fixed;bottom:24px;right:24px;z-index:900;background:var(--card);border:1px solid var(--borderB);border-radius:var(--rs);padding:12px 18px;font-size:13px;font-weight:600;box-shadow:var(--sh);transform:translateY(60px);opacity:0;transition:all .35s cubic-bezier(.4,0,.2,1);pointer-events:none;max-width:300px}
+.toast.on{transform:translateY(0);opacity:1}
+.tOk{border-left:3px solid var(--teal)}.tErr{border-left:3px solid var(--coral)}.tWarn{border-left:3px solid var(--amber)}
+
+/* TARGET PREVIEW */
+.tPrevRow{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px}
+.tPrevRow:last-child{border-bottom:none}
+.tPrevM{color:var(--t2);font-weight:600}
+.tPrevVals{display:flex;gap:14px}
+.tPrevP{font-family:'DM Mono',monospace;color:var(--teal);font-size:11px}
+.tPrevR{font-family:'DM Mono',monospace;color:var(--amber);font-size:11px}
+
+/* VIEWER MSG */
+.viewerMsg{background:var(--blueD);border:1px solid rgba(77,159,255,.22);border-radius:var(--r);padding:16px 20px;font-size:13px;color:var(--blue);font-weight:500;text-align:center;display:none}
+.viewerMsg.show{display:block}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--borderB);border-radius:3px}
+
+/* ── LTV TAB ── */
+/* Filter bar sticks just under the topbar (60px tall) so it stays
+   accessible while scrolling through the LTV sections. */
+.ltvBar .lbLbl{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);margin-right:4px}
+.ltvTypeToggle{display:inline-flex;background:var(--card);border:1px solid var(--border);border-radius:var(--rs);padding:2px;gap:2px}
+.ltvTypeToggle button{background:transparent;border:none;color:var(--t2);font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;padding:4px 12px;border-radius:5px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.ltvTypeToggle button.on{background:linear-gradient(135deg,var(--teal),var(--blue));color:#020d1a;box-shadow:0 2px 8px rgba(0,229,195,.18)}
+.ltvTypeToggle button:hover:not(.on){color:var(--t1);background:rgba(255,255,255,.04)}
+
+.ltvDayToggle{display:inline-flex;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:2px;gap:2px;margin-left:auto}
+.ltvDayToggle button{background:transparent;border:none;color:var(--t2);font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;padding:4px 12px;border-radius:18px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.ltvDayToggle button.on{background:var(--tealD);color:var(--teal);border:1px solid rgba(0,229,195,.4)}
+.ltvDayToggle button:hover:not(.on){color:var(--t1)}
+
+/* LTV KPI strip — denser than dashboard KPIs (no spark) */
+.ltvKpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:12px;margin-bottom:14px}
+.ltvKpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;position:relative;overflow:hidden;transition:transform .2s,box-shadow .2s;animation:fadeUp .5s ease both}
+.ltvKpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--lkc,var(--teal));z-index:1}
+.ltvKpi .kpiVal{font-family:'DM Mono',monospace;font-size:clamp(15px,1.5vw,20px);font-weight:500;color:var(--lkc,var(--teal));line-height:1;margin-bottom:6px;white-space:nowrap}
+.ltvKpi .kpiSub{font-size:10px;color:var(--t3);font-weight:500;display:flex;align-items:center;gap:6px}
+.lkD7{--lkc:var(--blue)}.lkD14{--lkc:var(--amber)}.lkD30{--lkc:var(--teal)}.lkGr{--lkc:var(--green)}.lkCo{--lkc:var(--coral)}
+.lkFc{--lkc:#a78bfa}
+.lkFc .kpiVal{border-bottom:1px dashed rgba(167,139,250,.5)}
+.ltvGrowth{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+@media(max-width:1100px){.ltvKpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.ltvKpis{grid-template-columns:1fr 1fr}}
+/* Cohort heatmap */
+.heatmapWrap{overflow-x:auto;max-height:520px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--rs);background:var(--card2)}
+.heatmapTable{width:100%;border-collapse:separate;border-spacing:0;font-family:'DM Mono',monospace;font-size:11px}
+.heatmapTable thead th{position:sticky;top:0;background:var(--card);color:var(--t3);font-family:'Poppins',sans-serif;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;padding:8px 10px;text-align:right;border-bottom:1px solid var(--border);z-index:2;white-space:nowrap}
+.heatmapTable thead th:first-child,
+.heatmapTable thead th:nth-child(2){text-align:left;position:sticky;left:0;z-index:3}
+.heatmapTable thead th:first-child{left:0}
+.heatmapTable thead th:nth-child(2){left:130px}
+.heatmapTable tbody td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);color:var(--t1);white-space:nowrap;transition:background .12s}
+.heatmapTable tbody td:first-child,
+.heatmapTable tbody td:nth-child(2){text-align:left;font-family:'Poppins',sans-serif;color:var(--t2);position:sticky;background:var(--card2);font-weight:500}
+.heatmapTable tbody td:first-child{left:0;font-weight:600;color:var(--t1)}
+.heatmapTable tbody td:nth-child(2){left:130px;font-size:10px}
+.heatmapTable tbody tr:hover td{background:rgba(0,229,195,.04)}
+.heatmapTable tbody tr:hover td:first-child,
+.heatmapTable tbody tr:hover td:nth-child(2){background:rgba(0,229,195,.08)}
+.hmCell{position:relative}
+.hmCell .hmFill{position:absolute;inset:3px;border-radius:4px;background:var(--hmCol,transparent);opacity:var(--hmAlpha,0);z-index:0;pointer-events:none}
+.hmCell span{position:relative;z-index:1}
+
+/* LTV leaderboard */
+.ltvLead{width:100%;border-collapse:collapse;font-size:11px}
+.ltvLead th{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--t3);padding:8px 10px;border-bottom:1px solid var(--border);text-align:left;white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s}
+.ltvLead th:hover{color:var(--teal)}
+.ltvLead th.sorted{color:var(--teal)}
+.ltvLead th.numCol{text-align:right}
+.ltvLead td{padding:8px 10px;border-bottom:1px solid var(--border);font-family:'DM Mono',monospace;color:var(--t2);white-space:nowrap}
+.ltvLead td.gameName{font-family:'Poppins',sans-serif;color:var(--t1);font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.ltvLead td.numCol{text-align:right;color:var(--t1)}
+.ltvLead td.posGr{color:var(--green)}
+.ltvLead td.negGr{color:var(--coral)}
+.ltvLead tr:last-child td{border-bottom:none}
+.ltvLead tbody tr:hover td{background:var(--card2)}
+.ltvShowAll{margin-top:10px;background:transparent;border:1px solid var(--border);color:var(--t2);padding:6px 14px;border-radius:var(--rs);font-size:11px;font-weight:600;cursor:pointer;transition:all .15s;font-family:'Poppins',sans-serif}
+.ltvShowAll:hover{border-color:var(--teal);color:var(--teal)}
+
+.ltvEmpty{padding:30px 20px;text-align:center;color:var(--t3);font-size:13px}
+.ltvLoading{padding:40px 20px;text-align:center;color:var(--t2);font-size:13px;display:flex;align-items:center;justify-content:center;gap:10px}
+.ltvLoading::before{content:'';display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--teal);border-radius:50%;animation:spin .7s linear infinite}
+
+/* Day-toggle chips above cumulative curves chart */
+.ltvDayChips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.ltvDayChip{font-family:'DM Mono',monospace;font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--t3);cursor:pointer;transition:all .15s;user-select:none;letter-spacing:.02em}
+.ltvDayChip:hover{color:var(--t1);border-color:var(--borderB)}
+.ltvDayChip.on{background:var(--tealD);color:var(--teal);border-color:rgba(0,229,195,.4)}
+.ltvDayChips .ltvChipLbl{font-family:'Poppins',sans-serif;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--t3);padding:4px 6px 4px 0;align-self:center}
+
+/* Performance Trends control bar */
+.ltvPerfBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-bottom:6px}
+
+/* ════ PlaySpare branding (logos embedded as data-URIs) ════ */
+/* Logos are real <img> elements (most reliable render) */
+.topbar .brandIcon{background:transparent;box-shadow:none;overflow:visible}
+.brandCube{width:28px;height:28px;object-fit:contain;display:block}
+.loginWord{width:210px;height:auto;object-fit:contain;display:block;margin:0 auto 20px;filter:drop-shadow(0 0 22px rgba(0,229,195,.28))}
+/* Loader: floating, glowing cube — cube MUST paint above the glow */
+.loaderLogoWrap{position:relative;display:flex;align-items:center;justify-content:center;width:170px;height:140px}
+.loaderGlow{position:absolute;z-index:1;width:150px;height:150px;border-radius:50%;
+  background:radial-gradient(circle,rgba(0,229,195,.22),transparent 70%);
+  animation:psGlow 2.2s ease-in-out infinite}
+.loaderLogo{position:relative;z-index:2;width:84px;height:84px;object-fit:contain;
+  animation:psFloat 2.2s ease-in-out infinite;
+  filter:drop-shadow(0 10px 28px rgba(0,229,195,.4))}
+@keyframes psFloat{
+  0%,100%{transform:translateY(6px) rotate(-5deg) scale(1)}
+  50%{transform:translateY(-12px) rotate(5deg) scale(1.07)}
 }
-
-async function buildLtvUI(){
-  // Lazy: fetch once per session, then re-render on filter change.
-  if(!_ltvLoaded){
-    await loadLtvData();
-    populateLtvDropdowns();
-    _ltvLoaded = true;
-    setLtvDateRange(90); // seed default install-date window (90d) + first render
-    return;
-  }
-  renderLtv();
-}
-
-// Force a fresh pull from the sheet — used by the ⟳ Refresh button when the
-// user has just edited rows in the Google Sheet and the in-memory snapshot
-// is stale. Bypasses the _ltvLoaded gate, then re-renders.
-async function reloadLtvData(btn){
-  const orig = btn ? btn.textContent : '';
-  if(btn){ btn.disabled = true; btn.textContent = '⟳ Refreshing…'; }
-  try {
-    await loadLtvData();
-    populateLtvDropdowns();
-    _ltvLoaded = true;
-    // If a date preset is active, re-seed it against the new latest date.
-    if(ltvFilters.rangeDays){ setLtvDateRange(ltvFilters.rangeDays); } else { renderLtv(); }
-    if(btn){ btn.textContent = '✓ Refreshed'; setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 1200); }
-  } catch(e){
-    if(btn){ btn.textContent = '✕ Failed';   setTimeout(()=>{ btn.textContent = orig; btn.disabled = false; }, 1500); }
-  }
-}
-
-async function loadLtvData(){
-  const isRealURL = SHEET_API_URL && SHEET_API_URL.includes('script.google.com') && SHEET_API_URL.includes('/exec');
-  if(!isRealURL){ ltvData = []; return; }
-  try {
-    const token = getToken();
-    if(!token) throw new Error('Not logged in');
-    // Cache-buster (_cb) defeats Google's edge cache + browser HTTP cache —
-    // without it, newly added rows in the LTV sheet take 5–15 min to appear.
-    const url = SHEET_API_URL + '?action=ltv&token=' + encodeURIComponent(token) + '&_cb=' + Date.now();
-    const res = await fetch(url, { redirect:'follow', mode:'cors', cache:'no-store' });
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    const json = JSON.parse(await res.text());
-    if(json.error) throw new Error(json.error);
-    ltvData = (json.data || []).map(r => {
-      const ap = parseAppName(r.app);
-      return {
-        installDate: r.installDate,
-        app:        r.app,
-        game:       ap.game,
-        plat:       ap.plat,
-        country:    r.country,
-        cohortSize: +r.cohortSize || 0,
-        type:       r.type,
-        days:       r.days || {}
-      };
-    });
-  } catch(e){
-    ltvData = [];
-    toast('LTV fetch failed — ' + e.message, 'warn');
-  }
-}
-
-function populateLtvDropdowns(){
-  const games = new Set(), plats = new Set(), countries = new Set();
-  (ltvData||[]).forEach(r => {
-    if(r.game) games.add(r.game);
-    if(r.plat) plats.add(r.plat);
-    // Skip "All"-like values — those become the default option, not a separate one
-    if(r.country && !isAllCountry(r.country)) countries.add(r.country);
-  });
-
-  // Game selector — disabled for now (LTV_SHOW_GAME). When off we hide the
-  // dropdown and don't filter by game (all games blended). Flip the flag to
-  // bring it back as a game-wise dropdown.
-  const gameList = [...games].sort();
-  const gEl = g('ltvGame');
-  if(gEl){
-    if(LTV_SHOW_GAME){
-      gEl.style.display = '';
-      const cur = gEl.value;
-      gEl.innerHTML = gameList.map(v=>`<option value="${escapeAttr(v)}">🎮 ${escapeHTML(v)}</option>`).join('');
-      gEl.value = gameList.includes(cur) ? cur : (gameList[0] || '');
-      ltvFilters.game = gEl.value;
-    } else {
-      gEl.style.display = 'none';
-      gEl.innerHTML = '';
-      ltvFilters.game = '';
-    }
-  }
-
-  // Platform tabs — Android / iOS only, no "All". Default to whichever has data
-  // (Android preferred); the buttons themselves are fixed in the markup.
-  const pEl = g('ltvPlatToggle');
-  if(pEl){
-    let cur = ltvFilters.plat;
-    if(cur!=='Android' && cur!=='iOS') cur = plats.has('Android') ? 'Android' : (plats.has('iOS') ? 'iOS' : 'Android');
-    ltvFilters.plat = cur;
-    cachedList('ltvPlatButtons','#ltvPlatToggle button').forEach(b=>b.classList.toggle('on', b.dataset.ltvPlat===cur));
-  }
-
-  // Country stays a dropdown with an "All Countries" default.
-  const cEl = g('ltvCountry');
-  if(cEl){
-    const cur = cEl.value;
-    cEl.innerHTML = `<option value="">All Countries</option>` +
-      [...countries].sort().map(v=>`<option value="${escapeAttr(v)}">${escapeHTML(v)}</option>`).join('');
-    cEl.value = cur;
-  }
-}
-
-function setLtvType(type, btn){
-  ltvFilters.type = type;
-  cachedList('ltvTypeButtons','#ltvTypeToggle button').forEach(b=>b.classList.toggle('on', b===btn));
-  renderLtv();
-}
-
-// Platform tab toggle (replaces the old dropdown). '' = All platforms.
-function setLtvPlat(plat, btn){
-  ltvFilters.plat = plat;
-  cachedList('ltvPlatButtons','#ltvPlatToggle button').forEach(b=>b.classList.toggle('on', b===btn));
-  renderLtv();
-}
-
-function onLtvGameChange(){
-  ltvFilters.game = v('ltvGame');
-  renderLtv();
-}
-
-// Latest install date present in the data (data runs a day behind) — anchor
-// for the install-date range presets so they always cover real cohorts.
-function ltvAnchorDate(){
-  let mx = '';
-  (ltvData||[]).forEach(r => { if(r.installDate && r.installDate > mx) mx = r.installDate; });
-  return mx; // 'YYYY-MM-DD' or ''
-}
-
-// Install-date range presets. days=0 → All (clears the window). Default is 45d
-// so cohorts old enough to have a mature D30 value are included.
-function setLtvDateRange(days){
-  ltvFilters.rangeDays = days;
-  cachedList('ltvDateButtons','#ltvDateToggle button').forEach(b=>b.classList.toggle('on', +b.dataset.ltvDays===days));
-  const fromEl=g('ltvFrom'), toEl=g('ltvTo');
-  if(!days){
-    if(fromEl) fromEl.value=''; if(toEl) toEl.value='';
-  } else {
-    const anchor = ltvAnchorDate();
-    if(anchor){
-      const d = new Date(anchor+'T00:00:00');
-      d.setDate(d.getDate() - (days-1));
-      const pad=n=>String(n).padStart(2,'0');
-      const from = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-      if(fromEl) fromEl.value=from; if(toEl) toEl.value=anchor;
-    }
-  }
-  renderLtv();
-}
-
-// Manual edit of the From/To inputs → drop the active preset highlight.
-function onLtvDateInput(){
-  ltvFilters.rangeDays = null;
-  cachedList('ltvDateButtons','#ltvDateToggle button').forEach(b=>b.classList.remove('on'));
-  renderLtv();
-}
-
-function setLtvRange(range, btn){
-  ltvFilters.range = range;
-  cachedList('ltvRangeButtons','.ltvDayToggle button').forEach(b=>b.classList.toggle('on', b===btn));
-  // Re-seed visible-day set so chips list reflects newly available days.
-  // Keep currently-checked defaults that still exist in the active range.
-  const allDays = range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-  const next = new Set();
-  LTV_DAYS_DEFAULT_VISIBLE.forEach(d => { if(allDays.includes(d)) next.add(d); });
-  // Preserve user-added days that still belong to the range
-  ltvVisibleDays.forEach(d => { if(allDays.includes(d)) next.add(d); });
-  ltvVisibleDays = next;
-  renderLtv();
-}
-
-function toggleLtvDay(day){
-  if(ltvVisibleDays.has(day)){
-    if(ltvVisibleDays.size === 1) return; // need at least one
-    ltvVisibleDays.delete(day);
-  } else {
-    ltvVisibleDays.add(day);
-  }
-  renderLtvDayChips();
-  getLtvFiltered();
-  renderLtvCurve(getLtvComparisonRows());
-}
-
-function renderLtvDayChips(){
-  const wrap = g('ltvDayChips');
-  if(!wrap) return;
-  const allDays = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-  wrap.innerHTML = '<span class="ltvChipLbl">Days on chart</span>'
-    + allDays.map(d => {
-        const on = ltvVisibleDays.has(d);
-        return `<button class="ltvDayChip${on?' on':''}" data-ltv-day="${escapeAttr(d)}">${d}</button>`;
-      }).join('');
-}
-
-function renderLtvPerfDayDropdown(){
-  const sel = g('ltvPerfDay');
-  if(!sel) return;
-  const allDays = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-  // If the previously selected day isn't available anymore, fall back to D28.
-  if(!allDays.includes(ltvPerfDay)) ltvPerfDay = allDays.includes('D28') ? 'D28' : allDays[0];
-  sel.innerHTML = allDays.map(d => `<option value="${d}"${d===ltvPerfDay?' selected':''}>${d.replace('D','Day ')}</option>`).join('');
-  // Keep period dropdown in sync with state
-  const per = g('ltvPerfPeriod');
-  if(per) per.value = ltvPerfPeriod;
-}
-
-
-function getLtvFiltered(){
-  // Read inputs each time so manual select changes flow through.
-  // Platform now comes from the tab toggle (ltvFilters.plat), not a <select>.
-  // Game filter only applies when the selector is enabled (LTV_SHOW_GAME).
-  ltvFilters.game    = LTV_SHOW_GAME ? v('ltvGame') : '';
-  ltvFilters.country = v('ltvCountry');
-  ltvFilters.from    = v('ltvFrom');
-  ltvFilters.to      = v('ltvTo');
-  return (ltvData||[]).filter(r=>{
-    if(r.type !== ltvFilters.type) return false;
-    if(ltvFilters.game && r.game !== ltvFilters.game) return false;
-    if(ltvFilters.plat && r.plat !== ltvFilters.plat) return false;
-    // Country filter: empty selection means "All Countries" → use the
-    // pre-aggregated "All" rows in the sheet (NOT a sum of individual
-    // countries, since we only have a subset of countries).
-    if(ltvFilters.country){
-      if(r.country !== ltvFilters.country) return false;
-    } else {
-      if(!isAllCountry(r.country)) return false;
-    }
-    if(ltvFilters.from && r.installDate && r.installDate < ltvFilters.from) return false;
-    if(ltvFilters.to   && r.installDate && r.installDate > ltvFilters.to)   return false;
-    return true;
-  });
-}
-
-function getLtvComparisonRows(){
-  return (ltvData||[]).filter(r=>{
-    if(ltvFilters.game && r.game !== ltvFilters.game) return false;
-    if(ltvFilters.plat && r.plat !== ltvFilters.plat) return false;
-    if(ltvFilters.country){
-      if(r.country !== ltvFilters.country) return false;
-    } else {
-      if(!isAllCountry(r.country)) return false;
-    }
-    if(ltvFilters.from && r.installDate && r.installDate < ltvFilters.from) return false;
-    if(ltvFilters.to   && r.installDate && r.installDate > ltvFilters.to)   return false;
-    return true;
-  });
-}
-
-function renderLtv(){
-  if(!_ltvLoaded){ return; } // not opened yet
-  // Sync chip + dropdown UIs with current state regardless of data presence
-  renderLtvDayChips();
-  renderLtvFcBar();
-  renderLtvPerfDayDropdown();
-  const rows = getLtvFiltered();
-  if(!rows.length){
-    g('ltvKpis').innerHTML = '<div class="ltvEmpty" style="grid-column:1/-1">No LTV rows match the current filters.</div>';
-    g('ltvHeatmapWrap').innerHTML = '<div class="ltvEmpty">No data.</div>';
-    g('ltvLeadTable').innerHTML = '';
-    g('ltvShowAllBtn').style.display = 'none';
-    if(charts.ltvCurve){ charts.ltvCurve.destroy(); charts.ltvCurve = null; }
-    if(charts.ltvFc){    charts.ltvFc.destroy();    charts.ltvFc    = null; }
-    if(charts.ltvPerf){  charts.ltvPerf.destroy();  charts.ltvPerf  = null; }
-    return;
-  }
-  const comparisonRows = getLtvComparisonRows();
-  renderLtvKpis(rows);
-  renderLtvCurve(comparisonRows);
-  renderLtvForecastChart(rows);
-  renderLtvPerformance(comparisonRows);
-  renderLtvHeatmap(rows);
-  renderLtvLeaderboard(rows);
-}
-
-// Cohort-size weighted mean of a day across rows
-function ltvAvg(rows, day){
-  let num = 0, den = 0;
-  rows.forEach(r=>{
-    const val = r.days[day];
-    if(val == null || isNaN(val)) return;
-    const w = r.cohortSize || 1;
-    num += val * w; den += w;
-  });
-  return den > 0 ? num/den : 0;
-}
-
-// Weighted mean of a day + coverage (share of cohort weight that actually has it)
-function ltvAvgCov(rows, day){
-  let num=0, den=0, tot=0;
-  rows.forEach(r=>{
-    const w = r.cohortSize || 1; tot += w;
-    const val = r.days[day];
-    if(val == null || isNaN(val)) return;
-    num += val*w; den += w;
-  });
-  return { val: den>0 ? num/den : null, cov: tot>0 ? den/tot : 0 };
-}
-
-const _dnum = d => parseInt(String(d).replace('D',''), 10);
-
-/* ── HYBRID LTV FORECAST ─────────────────────────────────────────────
-   Primary: "shape from history, level from cohort" — scale the current
-   anchor value by the average ratio curve of matured cohorts.
-   Fallback: power-law (y = a·x^b) fit on the actual points.
-   Returns { actual, forecast (per day), anchor, method, targetVal }. */
-function ltvForecastFor(rows, days, target){
-  if(!rows || !rows.length) return null;
-  const tnum = _dnum(target);
-  const list = days.filter(d => _dnum(d) <= tnum);
-  const actual = {}, cov = {};
-  list.forEach(d => { const a = ltvAvgCov(rows, d); actual[d] = a.val; cov[d] = a.cov; });
-
-  // Anchor = latest day (≤ target) with solid coverage (≥50%); else latest with any data
-  let anchor = null;
-  list.forEach(d => { if(actual[d] != null && cov[d] >= 0.5) anchor = d; });
-  if(!anchor) list.forEach(d => { if(actual[d] != null) anchor = d; });
-  if(!anchor) return null;
-  const aNum = _dnum(anchor), aVal = actual[anchor];
-
-  // Matured cohorts = have both anchor and target actuals
-  const matured = rows.filter(r => {
-    const va = r.days[anchor], vt = r.days[target];
-    return va != null && !isNaN(va) && va > 0 && vt != null && !isNaN(vt);
-  });
-  const maturedWeight = matured.reduce((s,r)=>s+(r.cohortSize||0), 0);
-  const forecast = {}; let method;
-
-  if(matured.length >= 3 && maturedWeight > 0){
-    method = 'scaling';
-    list.forEach(d => {
-      if(_dnum(d) <= aNum){ forecast[d] = actual[d]; return; }
-      let num=0, den=0;
-      matured.forEach(r => {
-        const vd=r.days[d], va=r.days[anchor];
-        if(vd==null||va==null||isNaN(vd)||isNaN(va)||va<=0) return;
-        const w=r.cohortSize||1; num += (vd/va)*w; den += w;
-      });
-      forecast[d] = den>0 ? aVal*(num/den) : null;
-    });
-  } else {
-    method = 'curve';
-    const pts = [];
-    list.forEach(d => { const x=_dnum(d); if(x>=1 && actual[d]!=null && actual[d]>0) pts.push([x, actual[d]]); });
-    let a=null, b=null;
-    if(pts.length >= 2){
-      let sx=0,sy=0,sxx=0,sxy=0, n=pts.length;
-      pts.forEach(([x,y])=>{ const lx=Math.log(x), ly=Math.log(y); sx+=lx; sy+=ly; sxx+=lx*lx; sxy+=lx*ly; });
-      const denom = n*sxx - sx*sx;
-      if(denom !== 0){ b = (n*sxy - sx*sy)/denom; a = Math.exp((sy - b*sx)/n); }
-    }
-    list.forEach(d => {
-      const x=_dnum(d);
-      if(x <= aNum){ forecast[d] = actual[d]; return; }
-      forecast[d] = (a!=null && b!=null) ? a*Math.pow(x, b) : null;
-    });
-    // Make the fitted curve continuous at the anchor
-    if(a!=null){
-      const fa = a*Math.pow(aNum, b);
-      if(fa > 0){ const k = aVal/fa; list.forEach(d => { if(_dnum(d) > aNum && forecast[d]!=null) forecast[d] *= k; }); }
-    }
-  }
-  return { actual, forecast, anchor, method, cohorts: matured.length, targetVal: forecast[target] };
-}
-
-function renderLtvFcBar(){
-  const el = g('ltvFcBar'); if(!el) return;
-  el.innerHTML = '<span class="ltvChipLbl">Forecast</span>'
-    + `<button class="ltvDayChip${ltvForecastOn?' on':''}" data-ltv-forecast-toggle>${ltvForecastOn?'On':'Off'}</button>`
-    + '<span class="ltvChipLbl" style="margin-left:10px">to</span>'
-    + ['D28','D30'].map(d => `<button class="ltvDayChip${ltvForecastTarget===d?' on':''}" data-ltv-forecast-target="${escapeAttr(d)}">${d}</button>`).join('')
-    + '<span id="ltvFcNote" style="font-size:10px;color:var(--t3);margin-left:12px"></span>';
-}
-function toggleLtvForecast(){ ltvForecastOn = !ltvForecastOn; renderLtvFcBar(); renderLtv(); }
-function setLtvForecastTarget(d){ ltvForecastTarget = d; renderLtvFcBar(); renderLtv(); }
-
-function renderLtvKpis(rows){
-  const d7  = ltvAvg(rows, 'D7');
-  const d14 = ltvAvg(rows, 'D14');
-  const d30 = ltvAvg(rows, 'D30');
-  const cohortSum = rows.reduce((a,r)=>a+(r.cohortSize||0), 0);
-  // Growth: D7 -> D30
-  const growth = d7 > 0 ? ((d30 - d7) / d7 * 100) : 0;
-  const grCls  = growth >= 0 ? 'up' : 'dn';
-  const grSign = growth >= 0 ? '+' : '';
-  // D7 -> D14 sub-growth (shown under D14 tile)
-  const gr14   = d7 > 0 ? ((d14 - d7) / d7 * 100) : 0;
-  // D14 -> D30 sub-growth (shown under D30 tile)
-  const gr30   = d14 > 0 ? ((d30 - d14) / d14 * 100) : 0;
-  const fmtUSD = n => '$' + n.toFixed(2);
-
-  // Forecast tile (est. D28/D30) — hybrid engine on the current selection
-  let fcTile = '';
-  if(ltvForecastOn){
-    const fdays = (ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD);
-    const fc = ltvForecastFor(rows, fdays, ltvForecastTarget);
-    if(fc && fc.targetVal != null){
-      const methodLbl = fc.method === 'scaling' ? `scaling · ${fc.cohorts} cohorts` : 'curve-fit';
-      fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, fmtUSD(fc.targetVal),
-        `<span class="ltvGrowth up">est.</span> from ${fc.anchor} · ${methodLbl}`);
-    } else {
-      fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, '—', 'not enough data');
-    }
-  }
-
-  g('ltvKpis').innerHTML = ''
-    + kpiTile('lkD7',  'Avg D7 LTV',  fmtUSD(d7),  rows.length + ' cohorts')
-    + kpiTile('lkD14', 'Avg D14 LTV', fmtUSD(d14), gr14 ? `<span class="ltvGrowth ${gr14>=0?'up':'dn'}">${gr14>=0?'+':''}${gr14.toFixed(1)}% vs D7</span>` : '—')
-    + kpiTile('lkD30', 'Avg D30 LTV', fmtUSD(d30), gr30 ? `<span class="ltvGrowth ${gr30>=0?'up':'dn'}">${gr30>=0?'+':''}${gr30.toFixed(1)}% vs D14</span>` : '—')
-    + kpiTile('lkGr',  'Growth D7→D30', `${grSign}${growth.toFixed(1)}%`, `<span class="ltvGrowth ${grCls}">${grSign}${(d30-d7).toFixed(2)} added</span>`)
-    + kpiTile('lkCo',  'Total Installs', cohortSum.toLocaleString(), 'across ' + rows.length + ' cohorts')
-    + fcTile;
-}
-function kpiTile(cls, label, val, sub){
-  return `<div class="ltvKpi ${cls}">
-    <div class="kpiLbl">${label}</div>
-    <div class="kpiVal">${val}</div>
-    <div class="kpiSub">${sub}</div>
-  </div>`;
-}
-
-function renderLtvCurve(comparisonRows){
-  const allDays = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-  // Only include days the user has toggled ON via the chip row.
-  // Falls back to all days if the visible-set is somehow empty.
-  let days = allDays.filter(d => ltvVisibleDays.has(d));
-  if(!days.length) days = allDays;
-  const labels = days.map(d => d.replace('D','Day '));
-  // Plot all 3 LTV types side-by-side regardless of selected type filter, so
-  // user can compare composition (Ad vs IAP vs Total). Selected type drives
-  // tables/KPIs only.
-  const allFiltered = comparisonRows || getLtvComparisonRows();
-  const byType = { 'Total LTV':[], 'Ad LTV':[], 'IAP LTV':[] };
-  allFiltered.forEach(r => { if(byType[r.type]) byType[r.type].push(r); });
-
-  const typeColor = { 'Total LTV':'rgb(0,229,195)', 'Ad LTV':'rgb(255,184,0)', 'IAP LTV':'rgb(77,159,255)' };
-  // Actual line is null-aware: where a day has no cohort data the line stops
-  // (instead of dropping to $0), so the dashed forecast can take over cleanly.
-  const dataset = (label, color, type) => ({
-    label,
-    data: days.map(d => { const a = ltvAvgCov(byType[type], d); return a.val==null ? null : +a.val.toFixed(2); }),
-    borderColor: color,
-    backgroundColor: color.replace(')', ',.08)').replace('rgb','rgba'),
-    borderWidth: type === ltvFilters.type ? 2.6 : 1.6,
-    pointRadius: 3, pointHoverRadius: 5,
-    tension: .35, fill: type === ltvFilters.type, spanGaps: false
-  });
-
-  const datasets = [
-    dataset('Total LTV', typeColor['Total LTV'], 'Total LTV'),
-    dataset('Ad LTV',    typeColor['Ad LTV'],    'Ad LTV'),
-    dataset('IAP LTV',   typeColor['IAP LTV'],   'IAP LTV')
-  ];
-
-  if(charts.ltvCurve) charts.ltvCurve.destroy();
-  charts.ltvCurve = new Chart(g('ltvCurveChart').getContext('2d'), {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      interaction:{ mode:'index', intersect:false },
-      plugins:{
-        legend:{ labels:{ color:tc(), font:{family:'Poppins',size:11}, boxWidth:11, padding:14 } },
-        tooltip:{
-          mode:'index', intersect:false,
-          callbacks:{
-            title: items => items[0].label,
-            label: ctx  => ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
-          }
-        }
-      },
-      scales:{
-        x:{ ticks:{color:tc(), font:{size:10,family:'Poppins'}}, grid:{color:gc()} },
-        y:{ ticks:{color:tc(), font:{family:'DM Mono',size:10}, callback:v=>'$'+v.toFixed(2)}, grid:{color:gc()}, beginAtZero:true }
-      }
-    }
-  });
-}
-
-/* ── LTV FORECAST CHART (dedicated card) ──
-   Selected LTV type only: solid actual up to the anchor, dashed projection
-   to the target day (D28/D30). Same hybrid engine as the KPI tile. */
-function ltvFcChartOpts(){
-  return {
-    responsive:true, maintainAspectRatio:false,
-    interaction:{ mode:'index', intersect:false },
-    plugins:{
-      legend:{ labels:{ color:tc(), font:{family:'Poppins',size:11}, boxWidth:11, padding:14 } },
-      tooltip:{ mode:'index', intersect:false, callbacks:{
-        title: items => items[0].label,
-        label: ctx  => ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
-      } }
-    },
-    scales:{
-      x:{ ticks:{color:tc(), font:{size:10,family:'Poppins'}}, grid:{color:gc()} },
-      y:{ ticks:{color:tc(), font:{family:'DM Mono',size:10}, callback:v=>'$'+v.toFixed(2)}, grid:{color:gc()}, beginAtZero:true }
-    }
-  };
-}
-function renderLtvForecastChart(rows){
-  const canvas = g('ltvFcChart'); if(!canvas) return;
-  const fcNote = g('ltvFcNote');
-  if(charts.ltvFc){ charts.ltvFc.destroy(); charts.ltvFc = null; }
-  if(!ltvForecastOn){
-    if(fcNote) fcNote.textContent = 'Forecast off — turn On to project.';
-    const cx=canvas.getContext('2d'); cx.clearRect(0,0,canvas.width,canvas.height);
-    return;
-  }
-  const allDays = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-  const tnum = _dnum(ltvForecastTarget);
-  const days = allDays.filter(d => _dnum(d) <= tnum);
-  const labels = days.map(d => d.replace('D','Day '));
-  const type = ltvFilters.type;
-  const col  = type==='Ad LTV' ? 'rgb(255,184,0)' : (type==='IAP LTV' ? 'rgb(77,159,255)' : 'rgb(0,229,195)');
-
-  const fc = ltvForecastFor(rows, days, ltvForecastTarget);
-  if(!fc || fc.targetVal == null){
-    if(fcNote) fcNote.textContent = 'Not enough data to forecast this selection.';
-    charts.ltvFc = new Chart(canvas.getContext('2d'), { type:'line', data:{ labels, datasets:[] }, options: ltvFcChartOpts() });
-    return;
-  }
-  const aNum = _dnum(fc.anchor);
-  const actualData = days.map(d => fc.actual[d]!=null ? +fc.actual[d].toFixed(2) : null);
-  const fcData     = days.map(d => { const x=_dnum(d); if(x < aNum) return null; return fc.forecast[d]!=null ? +fc.forecast[d].toFixed(2) : null; });
-
-  charts.ltvFc = new Chart(canvas.getContext('2d'), {
-    type:'line',
-    data:{ labels, datasets:[
-      { label: type.replace(' LTV','')+' (actual)', data: actualData, borderColor: col,
-        backgroundColor: col.replace(')', ',.12)').replace('rgb','rgba'),
-        borderWidth:2.6, pointRadius:3, pointHoverRadius:5, tension:.35, fill:true, spanGaps:false },
-      { label: 'Forecast → '+ltvForecastTarget, data: fcData, borderColor: col, borderDash:[6,5],
-        borderWidth:2, pointRadius:2, pointStyle:'rectRot', pointHoverRadius:5, tension:.35, fill:false, spanGaps:true }
-    ]},
-    options: ltvFcChartOpts()
-  });
-  if(fcNote) fcNote.textContent = `Est. ${ltvForecastTarget} ${type.replace(' LTV','')}: $${fc.targetVal.toFixed(2)} · ${fc.method==='scaling'?('historical scaling · '+fc.cohorts+' cohorts'):'curve-fit'} from ${fc.anchor}`;
-}
-
-/* ── Performance Trends ──
-   X-axis: install date (or week / month bucket)
-   Y-axis: avg LTV at the selected cohort day (D7, D14, D30, ...)
-   3 lines: Ad / IAP / Total — selected type drawn bold + filled */
-function renderLtvPerformance(comparisonRows){
-  // Pull current selections from the controls
-  const dayEl = g('ltvPerfDay'), perEl = g('ltvPerfPeriod');
-  if(dayEl && dayEl.value) ltvPerfDay = dayEl.value;
-  if(perEl && perEl.value) ltvPerfPeriod = perEl.value;
-
-  // Match heatmap/leaderboard scoping: respect game/plat/country/date,
-  // but plot all 3 LTV types for comparison (ignore type filter here).
-  const allFiltered = comparisonRows || getLtvComparisonRows();
-
-  // Bucket key per period
-  const bucketOf = dateStr => {
-    if(!dateStr) return '';
-    if(ltvPerfPeriod === 'monthly') return dateStr.slice(0,7); // YYYY-MM
-    if(ltvPerfPeriod === 'weekly'){
-      // ISO-week-ish — just snap to Monday so labels stay readable
-      const d = new Date(dateStr + 'T00:00:00');
-      if(isNaN(d)) return dateStr;
-      const dow = d.getDay() || 7;        // Sun=0 → 7
-      d.setDate(d.getDate() - (dow-1));
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    }
-    return dateStr;
-  };
-
-  // Aggregate by (type, bucket) → cohort-size weighted avg of selected day
-  const agg = {};   // agg[type][bucket] = {num, den}
-  ['Total LTV','Ad LTV','IAP LTV'].forEach(t => agg[t] = {});
-  allFiltered.forEach(r => {
-    if(!agg[r.type]) return;
-    const v = r.days?.[ltvPerfDay];
-    if(v == null || isNaN(v)) return;
-    const w = r.cohortSize || 1;
-    const k = bucketOf(r.installDate);
-    if(!k) return;
-    if(!agg[r.type][k]) agg[r.type][k] = { num:0, den:0 };
-    agg[r.type][k].num += v * w;
-    agg[r.type][k].den += w;
-  });
-
-  // Union of all buckets across types, sorted ascending
-  const buckets = [...new Set(
-    Object.values(agg).flatMap(o => Object.keys(o))
-  )].sort();
-
-  if(!buckets.length){
-    if(charts.ltvPerf){ charts.ltvPerf.destroy(); charts.ltvPerf = null; }
-    return;
-  }
-
-  const valueFor = (type, b) => {
-    const c = agg[type][b];
-    return c && c.den > 0 ? +(c.num / c.den).toFixed(2) : null;
-  };
-
-  const fmtBucketLbl = b => {
-    if(ltvPerfPeriod === 'monthly'){
-      const [yr, mo] = b.split('-');
-      return MONTHS[(+mo)-1] + " '" + yr.slice(2);
-    }
-    // daily / weekly → "16 Mar"
-    return fmtLbl(b);
-  };
-
-  const dataset = (label, color, type) => ({
-    label, data: buckets.map(b => valueFor(type, b)),
-    borderColor: color,
-    backgroundColor: color.replace(')', ',.10)').replace('rgb','rgba'),
-    borderWidth: type === ltvFilters.type ? 2.6 : 1.4,
-    pointRadius: type === ltvFilters.type ? 3 : 1.5,
-    pointHoverRadius: 5,
-    tension: .35,
-    fill: type === ltvFilters.type,
-    spanGaps: true
-  });
-
-  if(charts.ltvPerf) charts.ltvPerf.destroy();
-  charts.ltvPerf = new Chart(g('ltvPerfChart').getContext('2d'), {
-    type:'line',
-    data:{
-      labels: buckets.map(fmtBucketLbl),
-      datasets:[
-        dataset('Total LTV', 'rgb(0,229,195)', 'Total LTV'),
-        dataset('Ad LTV',    'rgb(255,184,0)', 'Ad LTV'),
-        dataset('IAP LTV',   'rgb(77,159,255)','IAP LTV')
-      ]
-    },
-    options:{
-      responsive:true, maintainAspectRatio:false,
-      interaction:{ mode:'index', intersect:false },
-      plugins:{
-        legend:{ labels:{ color:tc(), font:{family:'Poppins',size:11}, boxWidth:11, padding:14 } },
-        tooltip:{
-          mode:'index', intersect:false,
-          callbacks:{
-            title: items => `${ltvPerfDay} · ${items[0].label}`,
-            label: ctx  => ctx.parsed.y == null ? ` ${ctx.dataset.label}: —` : ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
-          }
-        }
-      },
-      scales:{
-        x:{ ticks:{color:tc(), font:{size:10,family:'Poppins'}, maxRotation:45, autoSkip:true, maxTicksLimit:14}, grid:{color:gc()} },
-        y:{ ticks:{color:tc(), font:{family:'DM Mono',size:10}, callback:v=>'$'+v.toFixed(2)}, grid:{color:gc()}, beginAtZero:true }
-      }
-    }
-  });
-}
-
-function renderLtvHeatmap(rows){
-  const days = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-
-  // Group by install date — when game/country aren't filtered (or even when
-  // they are, but multiple rows still match), collapse them into a single
-  // cohort-size weighted row per date. This makes the heatmap a clean
-  // time-series view; per-game breakdown lives in the Leaderboard below.
-  const byDate = {};
-  rows.forEach(r => {
-    const dt = r.installDate || '';
-    if(!dt) return;
-    if(!byDate[dt]) byDate[dt] = {
-      installDate: dt,
-      cohortSize:  0,
-      games:       new Set(),
-      countries:   new Set(),
-      sum:         {}    // sum[day] = { num, den } for weighted mean
-    };
-    const grp = byDate[dt];
-    grp.cohortSize += (r.cohortSize || 0);
-    if(r.game)    grp.games.add(r.game);
-    if(r.country) grp.countries.add(r.country);
-    const w = r.cohortSize || 1;
-    days.forEach(d => {
-      const v = r.days?.[d];
-      if(v == null || isNaN(v)) return;
-      if(!grp.sum[d]) grp.sum[d] = { num: 0, den: 0 };
-      grp.sum[d].num += v * w;
-      grp.sum[d].den += w;
-    });
-  });
-
-  const sorted = Object.values(byDate)
-    .map(g => {
-      const dayVals = {};
-      days.forEach(d => {
-        dayVals[d] = (g.sum[d] && g.sum[d].den > 0) ? g.sum[d].num / g.sum[d].den : null;
-      });
-      return {
-        installDate: g.installDate,
-        cohortSize:  g.cohortSize,
-        games:       [...g.games],
-        countries:   [...g.countries],
-        days:        dayVals
-      };
-    })
-    .sort((a,b) => (a.installDate||'').localeCompare(b.installDate||''));
-
-  // Normalize each column independently so colors compare within a day.
-  const colMax = {};
-  days.forEach(d => {
-    let mx = 0;
-    sorted.forEach(r => { const v = r.days[d]; if(v != null && v > mx) mx = v; });
-    colMax[d] = mx || 1;
-  });
-
-  // Smart label: single name if only one in the group, otherwise count.
-  const labelOf = (arr, singularName, pluralName) => {
-    if(!arr.length)    return '—';
-    if(arr.length===1) return arr[0];
-    return arr.length + ' ' + (arr.length===1 ? singularName : pluralName);
-  };
-
-  const head = '<thead><tr>'
-    + '<th>Install Date</th><th>Coverage</th><th>Cohort</th>'
-    + days.map(d => `<th>${d}</th>`).join('')
-    + '</tr></thead>';
-
-  const body = '<tbody>' + sorted.map(r => {
-    const cells = days.map(d => {
-      const val = r.days[d];
-      if(val == null || isNaN(val)) return '<td>—</td>';
-      const a = Math.min(1, val / colMax[d]) * 0.55;
-      return `<td class="hmCell" style="--hmCol:rgba(0,229,195,1);--hmAlpha:${a.toFixed(3)}"><div class="hmFill"></div><span>$${val.toFixed(2)}</span></td>`;
-    }).join('');
-
-    const gameLbl    = labelOf(r.games,     'game',    'games');
-    const countryLbl = labelOf(r.countries, 'country', 'countries');
-    // Tooltip shows the actual list when collapsed (helps debugging without clutter)
-    const tip = (r.games.length>1 || r.countries.length>1)
-      ? `${r.games.join(', ')}${r.countries.length ? ' — ' + r.countries.join(', ') : ''}`
-      : '';
-
-    return `<tr>
-      <td>${escapeHTML(r.installDate||'—')}</td>
-      <td${tip ? ' title="'+escapeAttr(tip)+'"' : ''}>${escapeHTML(gameLbl)} · ${escapeHTML(countryLbl)}</td>
-      <td>${(r.cohortSize||0).toLocaleString()}</td>
-      ${cells}
-    </tr>`;
-  }).join('') + '</tbody>';
-
-  g('ltvHeatmapWrap').innerHTML = '<table class="heatmapTable">' + head + body + '</table>';
-}
-
-function renderLtvLeaderboard(rows){
-  const days = ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD;
-  // Group by game + plat + country
-  const groups = {};
-  rows.forEach(r => {
-    const k = (r.game||r.app) + '|' + r.plat + '|' + r.country;
-    if(!groups[k]){
-      groups[k] = { game:r.game||r.app, plat:r.plat, country:r.country, cohortSize:0, days:{} };
-      days.forEach(d => groups[k].days[d] = { num:0, den:0 });
-    }
-    const w = r.cohortSize || 1;
-    groups[k].cohortSize += (r.cohortSize||0);
-    days.forEach(d => {
-      const v = r.days[d];
-      if(v != null && !isNaN(v)){
-        groups[k].days[d].num += v * w;
-        groups[k].days[d].den += w;
-      }
-    });
-  });
-  const list = Object.values(groups).map(gp => {
-    const out = { game:gp.game, plat:gp.plat, country:gp.country, cohortSize:gp.cohortSize };
-    days.forEach(d => { out[d] = gp.days[d].den > 0 ? gp.days[d].num/gp.days[d].den : 0; });
-    out.growth = out.D7 > 0 ? ((out.D30 - out.D7)/out.D7*100) : 0;
-    return out;
-  });
-
-  // Sort
-  const sortCol = ltvLeadSort.col, dir = ltvLeadSort.dir==='asc' ? 1 : -1;
-  list.sort((a,b) => ((a[sortCol]||0) - (b[sortCol]||0)) * dir
-    || (a.game||'').localeCompare(b.game||''));
-
-  // Header
-  const cols = ['game','plat','country','cohortSize', ...days, 'growth'];
-  const colLabels = { game:'Game', plat:'Platform', country:'Country', cohortSize:'Cohort', growth:'D7→D30' };
-  days.forEach(d => colLabels[d] = d);
-
-  const head = '<thead><tr>' + cols.map(c => {
-    const isNum = c === 'cohortSize' || c === 'growth' || days.indexOf(c) >= 0;
-    const sorted = c === sortCol ? ' sorted' : '';
-    const arrow  = c === sortCol ? (dir > 0 ? ' ▲' : ' ▼') : '';
-    return `<th class="${isNum?'numCol':''}${sorted}" data-ltv-sort="${escapeAttr(c)}">${colLabels[c]||c}${arrow}</th>`;
-  }).join('') + '</tr></thead>';
-
-  const visible = ltvShowAll ? list : list.slice(0, 10);
-  const fmt = n => '$' + n.toFixed(2);
-
-  const body = '<tbody>' + visible.map(r => {
-    return '<tr>'
-      + `<td class="gameName" title="${escapeAttr(r.game||'')}">${r.game ? escapeHTML(r.game) : '—'}</td>`
-      + `<td>${r.plat ? escapeHTML(r.plat) : '—'}</td>`
-      + `<td>${r.country ? escapeHTML(r.country) : '—'}</td>`
-      + `<td class="numCol">${(r.cohortSize||0).toLocaleString()}</td>`
-      + days.map(d => `<td class="numCol">${fmt(r[d]||0)}</td>`).join('')
-      + `<td class="numCol ${r.growth>=0?'posGr':'negGr'}">${r.growth>=0?'+':''}${r.growth.toFixed(1)}%</td>`
-      + '</tr>';
-  }).join('') + '</tbody>';
-
-  g('ltvLeadTable').innerHTML = head + body;
-  const showBtn = g('ltvShowAllBtn');
-  if(list.length > 10){
-    showBtn.style.display = 'inline-block';
-    showBtn.textContent = ltvShowAll ? 'Show top 10' : `Show all (${list.length})`;
-  } else {
-    showBtn.style.display = 'none';
-  }
-}
-function setLtvLeadSort(col){
-  if(ltvLeadSort.col === col){
-    ltvLeadSort.dir = ltvLeadSort.dir === 'asc' ? 'desc' : 'asc';
-  } else {
-    ltvLeadSort.col = col;
-    ltvLeadSort.dir = (col === 'game' || col === 'plat' || col === 'country') ? 'asc' : 'desc';
-  }
-  renderLtv();
-}
-function toggleLtvShowAll(){ ltvShowAll = !ltvShowAll; renderLtv(); }
+@keyframes psGlow{0%,100%{opacity:.45;transform:scale(.85)}50%{opacity:1;transform:scale(1.12)}}
+
+/* ── Projection (left) + Monthly Achievement (right) 2-col layout ── */
+.projGrid{display:grid;grid-template-columns:1fr 1.3fr;gap:18px;margin-bottom:18px;align-items:stretch}
+.projGaugeCol{display:flex;flex-direction:column;gap:18px;min-width:0}
+/* gauge card grows to fill the left column so its length matches the table on the right */
+.projGaugeCol .gaugeSection{flex:1;justify-content:center}
+@media(max-width:980px){.projGrid{grid-template-columns:1fr}.projGaugeCol .gaugeSection{flex:initial}}
+/* gauge spacing — give the title/arc/% room so nothing overlaps ("shade") */
+.gaugeTitle{margin-bottom:10px}
+.gaugeInfo{margin-top:-2px}
+.gaugeSection{gap:6px}
+/* Monthly Achievement: let the table fill the card's full height so the 12
+   rows distribute evenly instead of clustering at the top with an empty
+   gap at the bottom when the left (gauge) column is taller. */
+.projGrid .monthlyCard{display:flex;flex-direction:column}
+.projGrid .monthlyCard .cardHead{flex:0 0 auto}
+.projGrid .monthlyCard table.mTable{flex:1 1 auto;height:100%}
+.projGrid .monthlyCard table.mTable tbody td{vertical-align:middle}
+
+/* Extracted utility styles from index.html */
+.u-style-001{display:flex;gap:10px;margin-top:18px}
+.u-style-002{flex:1}
+.u-style-003{flex:2}
+.u-style-004{font-size:11px;color:var(--t2);margin-bottom:14px}
+.u-style-005{margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.u-style-006{font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.u-style-007{margin-top:18px;padding-top:16px;border-top:1px solid var(--border);text-align:center}
+.u-style-008{font-size:11px;color:var(--t3)}
+.u-style-009{font-size:11px;color:var(--t3);margin-top:4px}
+.u-style-010{display:none}
+.u-style-011{height:20px;margin:0 2px}
+.u-style-012{font-size:11px;color:var(--t3);font-weight:500;white-space:nowrap}
+.u-style-013{margin-bottom:18px}
+.u-style-014{position:relative;height:320px}
+.u-style-015{width:0%}
+.u-style-016{left:100%}
+.u-style-017{margin-top:10px;font-size:11px;font-weight:600;display:none}
+.u-style-018{color:var(--t2)}
+.u-style-019{margin-top:8px;font-size:10px;color:var(--t3);font-style:italic}
+.u-style-020{margin-left:4px}
+.u-style-021{overflow:auto;padding:16px}
+.u-style-022{position:relative;height:300px}
+.u-style-023{font-size:11px;color:var(--t3);margin:-6px 0 14px}
+.u-style-024{color:#3ddc84}
+.u-style-025{font-size:10px;color:var(--t3)}
+.u-style-026{position:relative;height:280px}
+.u-style-027{color:#007aff}
+.u-style-028{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.u-style-029{font-size:11px;color:var(--t2);font-weight:600}
+.u-style-030{color:#ff9900}
+.u-style-031{color:var(--teal)}
+.u-style-032{width:100%;border-collapse:collapse}
+.u-style-033{font-size:11px;color:var(--t3);margin-bottom:10px}
+.u-style-034{text-align:center;margin-top:8px;font-size:11px;color:var(--t3)}
+.u-style-035{display:flex;flex-direction:column;gap:16px}
+.u-style-036{font-size:15px}
+.u-style-037{font-size:12px;color:var(--t2);line-height:1.85}
+.u-style-038{margin-bottom:8px}
+.u-style-039{color:var(--t1)}
+.u-style-040{height:20px;margin:0 4px}
+.u-style-041{grid-column:1/-1}
+.u-style-042{margin-bottom:14px}
+.u-style-043{font-size:10px;font-weight:500;color:var(--t3);text-transform:none;letter-spacing:0}
+.u-style-044{position:relative;height:340px}
+.u-style-045{margin-left:8px}
+.u-style-046{position:relative;height:300px;margin-top:12px}
+.u-style-047{overflow-x:auto}
