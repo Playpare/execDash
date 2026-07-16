@@ -48,14 +48,8 @@ async function loadData(forceRefresh=false) {
       if(json.error) throw new Error('Apps Script: ' + json.error);
       if(!json.data || !Array.isArray(json.data)) throw new Error('No data array in response');
       rawData = parseJSON(json.data);
-      console.log('[ROAS DEBUG] main API response has json.roas?', json.roas, '| json.roasData?', json.roasData);
       roasData = parseRoasJSON(json.roas || json.roasData || []);
-      console.log('[ROAS DEBUG] roasData after parsing main response:', roasData.length, 'rows', roasData.slice(0,3));
-      if(!roasData.length) {
-        console.log('[ROAS DEBUG] main response had no ROAS rows — trying fallback ?action=roas ...');
-        roasData = await fetchRoasData(token, forceRefresh);
-        console.log('[ROAS DEBUG] roasData after fallback fetch:', roasData.length, 'rows', roasData.slice(0,3));
-      }
+      if(!roasData.length) roasData = await fetchRoasData(token, forceRefresh);
       if(!rawData.length) throw new Error('0 rows — check column names in Apps Script');
       window._fromCache = json._cached || false;
     } else {
@@ -90,15 +84,11 @@ async function fetchRoasData(token, forceRefresh=false) {
     const refreshParam = forceRefresh ? '&refresh=1' : '';
     const url = SHEET_API_URL + '?action=roas&token=' + encodeURIComponent(token) + refreshParam;
     const res = await fetch(url, { redirect:'follow', mode:'cors' });
-    console.log('[ROAS DEBUG] fallback fetch HTTP status:', res.status, res.ok);
     if(!res.ok) return [];
-    const rawTxt = await res.text();
-    console.log('[ROAS DEBUG] fallback raw response text (first 500 chars):', rawTxt.slice(0,500));
-    const json = JSON.parse(rawTxt);
-    if(json.error) { console.log('[ROAS DEBUG] fallback returned error:', json.error); return []; }
+    const json = JSON.parse(await res.text());
+    if(json.error) return [];
     return parseRoasJSON(json.roas || json.roasData || json.data || []);
   } catch(e) {
-    console.log('[ROAS DEBUG] fallback fetch threw an exception:', e.message);
     return [];
   }
 }
