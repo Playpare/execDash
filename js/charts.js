@@ -595,8 +595,24 @@ function renderProjected(){
       // Year Progress = cumulative Jan -> selected month, always full-year pace
       // (distinct from qProfit/qTarget above, which are the FULL annual totals
       // used by the Target/Achieved cards and the gauge itself).
+      // The current (in-progress) month's target is prorated by days elapsed so
+      // far — comparing it against a FULL month's target would unfairly show
+      // "behind" every month until its very last day.
       const ytdMonths = quarterMonths(0, yr).slice(0, pymMo);
-      const ytdTarget = ytdMonths.reduce((s,m)=>s+(TARGETS.months?.[m]?.profit||0),0);
+      const _dn = dataNow();
+      let ytdTarget = 0;
+      ytdMonths.forEach((m, idx) => {
+        const monthTarget = TARGETS.months?.[m]?.profit || 0;
+        const [mYr, mMo] = m.split('-').map(Number);
+        const monthIsPast = new Date(mYr, mMo, 0) <= _dn; // last day of that month already happened
+        if (idx === ytdMonths.length-1 && !monthIsPast) {
+          const daysInMonth = new Date(mYr, mMo, 0).getDate();
+          const elapsedDays = (mYr===_dn.getFullYear() && mMo===_dn.getMonth()+1) ? _dn.getDate() : daysInMonth;
+          ytdTarget += monthTarget * (elapsedDays / daysInMonth);
+        } else {
+          ytdTarget += monthTarget;
+        }
+      });
       const ytdActual = rawData.filter(r=>r.date&&ytdMonths.includes(r.date.slice(0,7))).reduce((s,r)=>s+r.profit,0);
       const yearProgress = getYearProgressInsight(ytdActual, ytdTarget);
       gQVarianceEl.textContent = yearProgress.text;
