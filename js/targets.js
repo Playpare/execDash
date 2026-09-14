@@ -1,6 +1,4 @@
-/* ═══════════════════════════════════════════════
-   TARGETS STORE
-═══════════════════════════════════════════════ */
+/* TARGETS STORE */
 const CY = new Date().getFullYear();
 function defaultTargets(yr) {
   const t = { year:yr, roiAlert:1.20, quarter:null, annual:null, months:{}, gameRoi:{} };
@@ -13,6 +11,7 @@ function loadTargets() {
 }
 let TARGETS = loadTargets();
 const saveTargetsStore = () => localStorage.setItem('ed_targets', JSON.stringify(TARGETS));
+let targetsEventsBound = false;
 
 /* ── SHARED TARGETS (server) ───────────────────────────────────────────
    Targets used to live only in this browser's localStorage, so they were
@@ -59,9 +58,7 @@ function computeAutoTargets() {
 }
 
 
-/* ═══════════════════════════════════════════════
-   TARGETS UI
-═══════════════════════════════════════════════ */
+/* TARGETS UI */
 function buildTargetsUI(){
   const isAdmin=CU?.r==='admin';
   g('viewerMsg').classList.toggle('show',!isAdmin);
@@ -84,8 +81,8 @@ function buildTargetsUI(){
     const mT=TARGETS.months?.[ym]||{profit:'',roi:''};
     return`<div class="tMonthRow">
       <div class="tMonthLbl">${MONTHS[i]}</div>
-      <input type="number" class="tInput" id="tp_${ym}" placeholder="0" value="${mT.profit||''}" oninput="onMonthInput()"/>
-      <input type="number" class="tInput" id="tr_${ym}" placeholder="1.20" step="0.01" value="${mT.roi||''}" oninput="onMonthInput()"/>
+      <input type="number" class="tInput" id="tp_${ym}" placeholder="0" value="${mT.profit||''}"/>
+      <input type="number" class="tInput" id="tr_${ym}" placeholder="1.20" step="0.01" value="${mT.roi||''}"/>
     </div>`;
   }).join('');
 
@@ -96,8 +93,8 @@ function buildTargetsUI(){
       const saved=TARGETS.gameRoi?.[gm]||'';
       const key=gm.replace(/[^a-zA-Z0-9]/g,'_');
       return`<div class="gameRoiRow">
-        <div class="gameRoiName" title="${gm}">${gm}</div>
-        <input type="number" class="tInput" id="gr_${key}" data-game="${gm}" placeholder="${fr2(TARGETS.roiAlert||1.20)}" step="0.01" value="${saved}"/>
+        <div class="gameRoiName" title="${escapeAttr(gm)}">${escapeHTML(gm)}</div>
+        <input type="number" class="tInput" id="gr_${key}" data-game="${escapeAttr(gm)}" placeholder="${fr2(TARGETS.roiAlert||1.20)}" step="0.01" value="${saved}"/>
       </div>`;
     }).join('');
   } else {
@@ -105,9 +102,12 @@ function buildTargetsUI(){
   }
   g('bulkYearLbl').textContent=yr;
   updateTargetPreview();
-  g('monthlyInputs').addEventListener('input',updateTargetPreview);
-  g('tQuarter').addEventListener('input',updateTargetPreview);
-  g('tAnnual').addEventListener('input',updateTargetPreview);
+  if(!targetsEventsBound){
+    g('monthlyInputs').addEventListener('input',onMonthInput);
+    g('tQuarter').addEventListener('input',updateTargetPreview);
+    g('tAnnual').addEventListener('input',updateTargetPreview);
+    targetsEventsBound = true;
+  }
 }
 
 function onMonthInput(){
@@ -208,3 +208,4 @@ function saveBulkTargets(){
   updateTargetPreview();
   toast('Full year filled — click Save to apply','warn');
 }
+

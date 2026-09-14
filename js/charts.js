@@ -8,9 +8,9 @@ function renderAll(){
   renderGameAnalysis();
 }
 
-/* ═══════════════════════════════════════════════
+/* =========================
    KPIs
-═══════════════════════════════════════════════ */
+========================= */
 function aggData(data){ return data.reduce((a,r)=>({rev:a.rev+r.revenue,spd:a.spd+r.spend,pro:a.pro+r.profit}),{rev:0,spd:0,pro:0}); }
 
 function renderKPIs(){
@@ -410,25 +410,20 @@ function last14DailyProfits(){
   return Object.keys(byDate).sort().map(d=>byDate[d]);
 }
 
-function getYearProgressInsight(ytdActual, ytdTarget) {
-  const pct = ytdTarget > 0 ? (ytdActual / ytdTarget * 100) : 0;
-  const dot = pct >= 100 ? '🟢' : pct >= 95 ? '🟡' : '🔴';
-
-  if (ytdTarget <= 0) {
-    return ytdActual > 0
-      ? { text: `${dot} ${pct.toFixed(1)}%  ▲ Ahead ${fmK(ytdActual)}`, className: 'pos' }
-      : { text: `${dot} 0.0%  ● On Track`, className: 'amb' };
+function getYearProgressInsight(actual, target) {
+  if (target <= 0) {
+    return actual > 0 ? { text: `▲ Ahead ${fmK(actual)}`, className: 'pos' } : { text: '● On Track', className: 'hi' };
   }
 
-  const diff = ytdActual - ytdTarget;
-  const tolerance = ytdTarget * 0.01;
+  const diff = actual - target;
+  const tolerance = target * 0.01;
   if (Math.abs(diff) <= tolerance) {
-    return { text: `${dot} ${pct.toFixed(1)}%  ● On Track`, className: 'amb' };
+    return { text: '● On Track', className: 'hi' };
   }
 
-  return diff > 0
-    ? { text: `${dot} ${pct.toFixed(1)}%  ▲ Ahead ${fmK(diff)}`, className: 'pos' }
-    : { text: `${dot} ${pct.toFixed(1)}%  ▼ Behind ${fmK(Math.abs(diff))}`, className: 'neg' };
+  return diff >= 0
+    ? { text: `▲ Ahead ${fmK(diff)}`, className: 'pos' }
+    : { text: `▼ Behind ${fmK(Math.abs(diff))}`, className: 'neg' };
 }
 
 function renderProjected(){
@@ -459,7 +454,7 @@ function renderProjected(){
   const elapsed=sortedDates.length; // actual days with data
 
   // Smart projection run-rate: exp-smoothing over the LAST 14 DAYS of data
-  // (rolling window) rather than only this month's days — steadier projection.
+  // (rolling window) rather than only this month's days  steadier projection.
   const series14=last14DailyProfits();
   const smartDailyAvg=expSmoothingProjection(series14);
   const daysLeft=dim-elapsed;
@@ -468,7 +463,7 @@ function renderProjected(){
   // month yesterday is the prior month's last day, so the just-ended month reads
   // as complete (e.g. on 1 Jun, May shows "Achieved/Missed", not "projected").
   const _dn=dataNow();
-  const isPastMonth=new Date(pymYr,pymMo,0) <= _dn;          // last day of month ≤ yesterday
+  const isPastMonth=new Date(pymYr,pymMo,0) <= _dn;          // last day of month  yesterday
   const isCurrentMonth=!isPastMonth && new Date(pymYr,pymMo-1,1) <= _dn; // started but not finished
   const proj=isPastMonth ? curProfit : curProfit+(smartDailyAvg*daysLeft); // past = actual; live = actual + projected remaining
   const pct=target>0?Math.min(proj/target*100,999):0;
@@ -484,18 +479,18 @@ function renderProjected(){
   // Badge
   const badge=g('projBadge');
   if(isPastMonth){
-    // Completed (past) month — judged on actuals: green if hit, red if missed
+    // Completed (past) month  judged on actuals: green if hit, red if missed
     const finalPct=target>0?curProfit/target*100:0;
-    if(finalPct>=100){badge.textContent='✓ Achieved '+finalPct.toFixed(1)+'%';badge.className='projBadge projExceeded';}
-    else{badge.textContent='✗ Missed '+finalPct.toFixed(1)+'%';badge.className='projBadge projOff';}
+    if(finalPct>=100){badge.textContent='OK Achieved '+finalPct.toFixed(1)+'%';badge.className='projBadge projExceeded';}
+    else{badge.textContent='X Missed '+finalPct.toFixed(1)+'%';badge.className='projBadge projOff';}
   } else if(exceeded){
     // Target already hit before month end
-    badge.textContent='🎉 Exceeded!';badge.className='projBadge projExceeded';
+    badge.textContent=' Exceeded!';badge.className='projBadge projExceeded';
   } else if(pct>=100){
-    // Projected month-end ≥ 100% of target
+    // Projected month-end  100% of target
     badge.textContent='On Track';badge.className='projBadge projOntrack';
   } else if(pct>=90){
-    // Projected 90–99% of target
+    // Projected 90-99% of target
     badge.textContent='At Risk';badge.className='projBadge projBehind';
   } else {
     // Projected < 90% of target
@@ -510,7 +505,7 @@ function renderProjected(){
   projMarkerLblEl.textContent=fmFull(target);
 
   // Metrics
-  g('profitMetLbl').textContent=exceeded?'🎉 Profit (Exceeded!)':'Current Profit';
+  g('profitMetLbl').textContent=exceeded?' Profit (Exceeded!)':'Current Profit';
   g('mCurProfit').textContent=fmFull(curProfit);
   g('mCurProfit').className='metVal '+(curProfit>=0?'good':'bad');
 
@@ -524,7 +519,7 @@ function renderProjected(){
     g('mRemaining').className='metVal warn';
   }
   g('mDailyAvg').textContent=fmFull(Math.round(smartDailyAvg));
-  g('mReqDaily').textContent=reqD>0?fmFull(Math.round(reqD)):'—';
+  g('mReqDaily').textContent=reqD>0?fmFull(Math.round(reqD)):'-';
   g('mReqDaily').className='metVal '+(reqD>smartDailyAvg?'bad':'warn');
 
   // Gap: Smart Daily Avg - Required Daily (explicit, so user doesn't subtract)
@@ -533,7 +528,7 @@ function renderProjected(){
     if(reqD>0){
       const gap=smartDailyAvg-reqD;
       gapWrap.style.display='block';
-      gapEl.textContent=(gap>=0?'+':'−')+fmFull(Math.round(Math.abs(gap)))+'/day';
+      gapEl.textContent=(gap>=0?'+':'-')+fmFull(Math.round(Math.abs(gap)))+'/day';
       gapEl.style.color=gap>=0?'var(--green)':'var(--coral)';
     } else {
       gapWrap.style.display='none';
@@ -544,16 +539,16 @@ function renderProjected(){
   const noteEl=g('projMethodNote');
   if(noteEl){
     if(isCurrentMonth&&elapsed>0){
-      noteEl.textContent=`⚡ EXP smoothing (α=0.35) on last ${series14.length} days — recent days weighted higher`;
+      noteEl.textContent=` EXP smoothing (=0.35) on last ${series14.length} days - recent days weighted higher`;
     } else if(!isCurrentMonth){
-      noteEl.textContent=elapsed>=dim?`✓ Month complete — actual: ${fmFull(curProfit)}`:`${elapsed} of ${dim} days recorded`;
+      noteEl.textContent=elapsed>=dim?`OK Month complete - actual: ${fmFull(curProfit)}`:`${elapsed} of ${dim} days recorded`;
     }
   }
 
-  // ═══ GAUGES ═══ — Quarter filter based on selectedQuarter (0=annual, 1-4=Q1-Q4)
+  //  GAUGES  Quarter filter based on selectedQuarter (0=annual, 1-4=Q1-Q4)
   const q = selectedQuarter;
   const qMonths = quarterMonths(q, yr);
-  const qLabel = q===0 ? 'Annual GP Target' : `Q${q} GP Target (${MONTHS[(q-1)*3]}–${MONTHS[Math.min((q-1)*3+2,11)]})`;
+  const qLabel = q===0 ? 'Annual GP Target' : `Q${q} GP Target (${MONTHS[(q-1)*3]} - ${MONTHS[Math.min((q-1)*3+2,11)]})`;
 
   // Quarter: profit from selected quarter's months
   const qProfit = rawData.filter(r=>r.date&&qMonths.includes(r.date.slice(0,7))).reduce((s,r)=>s+r.profit,0);
@@ -585,36 +580,14 @@ function renderProjected(){
       gQRemainingEl.className = 'gDetailVal ' + (remainingTarget<=0?'pos':'neg');
     }
     if(gQReqQuarterEl){
-      gQReqQuarterEl.textContent = requiredAvgQuarter===null ? '—' : fmK(requiredAvgQuarter);
+      gQReqQuarterEl.textContent = requiredAvgQuarter===null ? '-' : fmK(requiredAvgQuarter);
       gQReqQuarterEl.className = 'gDetailVal ' + (requiredAvgQuarter!==null && requiredAvgQuarter<=0?'pos':'hi');
     }
   }
   if(gQVarianceLabelEl) gQVarianceLabelEl.textContent = q===0 ? 'Year Progress' : 'Variance';
   if(gQVarianceEl){
     if(q===0){
-      // Year Progress = cumulative Jan -> selected month, always full-year pace
-      // (distinct from qProfit/qTarget above, which are the FULL annual totals
-      // used by the Target/Achieved cards and the gauge itself).
-      // The current (in-progress) month's target is prorated by days elapsed so
-      // far — comparing it against a FULL month's target would unfairly show
-      // "behind" every month until its very last day.
-      const ytdMonths = quarterMonths(0, yr).slice(0, pymMo);
-      const _dn = dataNow();
-      let ytdTarget = 0;
-      ytdMonths.forEach((m, idx) => {
-        const monthTarget = TARGETS.months?.[m]?.profit || 0;
-        const [mYr, mMo] = m.split('-').map(Number);
-        const monthIsPast = new Date(mYr, mMo, 0) <= _dn; // last day of that month already happened
-        if (idx === ytdMonths.length-1 && !monthIsPast) {
-          const daysInMonth = new Date(mYr, mMo, 0).getDate();
-          const elapsedDays = (mYr===_dn.getFullYear() && mMo===_dn.getMonth()+1) ? _dn.getDate() : daysInMonth;
-          ytdTarget += monthTarget * (elapsedDays / daysInMonth);
-        } else {
-          ytdTarget += monthTarget;
-        }
-      });
-      const ytdActual = rawData.filter(r=>r.date&&ytdMonths.includes(r.date.slice(0,7))).reduce((s,r)=>s+r.profit,0);
-      const yearProgress = getYearProgressInsight(ytdActual, ytdTarget);
+      const yearProgress = getYearProgressInsight(qProfit, qTarget);
       gQVarianceEl.textContent = yearProgress.text;
       gQVarianceEl.className = 'gDetailVal ' + yearProgress.className;
     } else {
@@ -622,7 +595,7 @@ function renderProjected(){
       gQVarianceEl.className = 'gDetailVal '+(qVar>=0?'pos':'neg');
     }
   }
-  // (Annual gauge removed — "Year" pill on the quarter gauge shows the full-year view)
+  // (Annual gauge removed  "Year" pill on the quarter gauge shows the full-year view)
 }
 
 function drawGauge(id,pct,fill,track,startLbl,endLbl){
@@ -653,7 +626,7 @@ function drawGauge(id,pct,fill,track,startLbl,endLbl){
 /* MONTHLY TABLE */
 function renderMonthly(){
   const yr=TARGETS.year||CY;
-  const now=dataNow();   // yesterday-based — data is a day behind
+  const now=dataNow();   // yesterday-based  data is a day behind
   const todayYm=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   // Is the data month already COMPLETE? (our latest data day = its last calendar
   // day) -> then it's judged on actuals, not shown as "projected / days left".
@@ -669,7 +642,7 @@ function renderMonthly(){
     if(!daysInMonth[ym])daysInMonth[ym]=new Set();
     daysInMonth[ym].add(r.date);
   });
-  // Smart daily avg — drives current & future month projections. Based on the
+  // Smart daily avg  drives current & future month projections. Based on the
   // LAST 14 DAYS of data (rolling window), not just the current month's days.
   const smartDaily=expSmoothingProjection(last14DailyProfits());
 
@@ -704,7 +677,7 @@ function renderMonthly(){
       deltaCell=delta!==null?`<span class="${delta>=0?'deltaPos':'deltaNeg'}">${delta>=0?'+':''}${fmK(delta)}</span>`:'';
       dailyCell=d?`<span style="color:var(--t1)">${fmK(actualDaily)}</span>${hasTgt?`<div style="font-size:9px;color:var(--t3);margin-top:1px">req ${fmK(reqFull)}</div>`:''}`:'';
       roiCell=roi!==null?`<span class="pill ${roi>=tgtRoi?'pillG':'pillR'}">${fr2(roi)}</span>`:'<span class="pillN"></span>';
-      if(ach!==null) status=`<span class="pill ${ach>=100?'pillG':'pillR'}">${ach>=100?'✓ ':'✗ '}${ach}%</span>`;
+      if(ach!==null) status=`<span class="pill ${ach>=100?'pillG':'pillR'}">${ach>=100?'OK ':''}${ach}%</span>`;
     }
     else if(isCurrent){
       const pro=d?d.pro:0;
@@ -718,18 +691,18 @@ function renderMonthly(){
       deltaCell=delta!==null?`<span class="${delta>=0?'deltaPos':'deltaNeg'}">${delta>=0?'+':''}${fmK(delta)}</span>`:'';
       dailyCell=`<span style="color:var(--t1)">${fmK(smartDaily)}</span>${hasTgt&&reqNow>0?`<div style="font-size:9px;color:var(--t3);margin-top:1px">req ${fmK(reqNow)}</div>`:''}`;
       roiCell=roi!==null?`<span class="pill ${roi>=tgtRoi?'pillG':'pillR'}">${fr2(roi)}</span>`:'<span class="pillN"></span>';
-      status=hasTgt?`<span class="pill pillC">◔ ${projPct.toFixed(1)}% projected</span>`:`<span class="pill pillC">In Progress</span>`;
+      status=hasTgt?`<span class="pill pillC">o ${projPct.toFixed(1)}% projected</span>`:`<span class="pill pillC">In Progress</span>`;
     }
     else if(isFuture){
       const projPct=hasTgt?proj/mT.profit*100:0;
       const delta=hasTgt?proj-mT.profit:null;
       profitCell=hasTgt?`<span style="color:var(--t3)">~${fmK(proj)}</span>`:'';
-      deltaCell=delta!==null?`<span style="color:var(--t3)">~${delta>=0?'+':'−'}${fmK(Math.abs(delta))}</span>`:'';
+      deltaCell=delta!==null?`<span style="color:var(--t3)">~${delta>=0?'+':'-'}${fmK(Math.abs(delta))}</span>`:'';
       dailyCell=hasTgt?`<span style="color:var(--t1)">${fmK(smartDaily)}</span><div style="font-size:9px;color:var(--t3);margin-top:1px">need ${fmK(reqFull)}</div>`:'';
       roiCell=`<span style="color:var(--t3);font-family:'DM Mono',monospace">${fr2(tgtRoi)}</span>`;
       if(hasTgt){
         const cls=projPct>=100?'pillG':projPct>=80?'pillA':'pillR';
-        const arr=projPct>=80?'▲':'▼';
+        const arr=projPct>=80?'>':'<';
         status=`<span class="pill ${cls}">${arr} ${projPct.toFixed(1)}% proj</span>`;
       }
     }
@@ -819,7 +792,7 @@ function renderTargetChart(){
               if(!isCompleteMonth(ym)){
                 return ach!==null ? [` Achievement: ${ach}% so far`,` (month in progress)`] : [` (month in progress)`];
               }
-              const achStr=ach!==null?(ach>=100?'✓ '+ach+'%':'✗ '+ach+'%'):'';
+              const achStr=ach!==null?(ach>=100?'OK '+ach+'%':'X '+ach+'%'):'';
               const variance=tgt?d.pro-tgt:null;
               const varStr=variance!==null?(variance>=0?'+':'')+fmK(variance):'';
               return[` Achievement: ${achStr}`,` vs Target: ${varStr}`];
@@ -836,13 +809,12 @@ function renderTargetChart(){
   });
 }
 
-/* ═══════════════════════════════════════════════
+/* 
    ALERTS (current month, per-game threshold)
-═══════════════════════════════════════════════ */
-// ┌─────────────────────────────────────────────────────────────┐
-// │  ALERT SYSTEM TOGGLE                                          │
-// │  Set to  true  to turn the ROI alert badge + banner back on. │
-// └─────────────────────────────────────────────────────────────┘
+ */
+// 
+//   ALERT SYSTEM TOGGLE                                          
+//   Set to  true  to turn the ROI alert badge + banner back on. 
 // 
 const ALERTS_ENABLED = false;
 
@@ -854,7 +826,7 @@ function renderAlerts(){
     if(b) b.classList.remove('show');
     return;
   }
-  // current DATA month (yesterday-based — data is a day behind, so on 1 Jun we
+  // current DATA month (yesterday-based  data is a day behind, so on 1 Jun we
   // still alert on May's games, not the empty June)
   const _ad=dataNow();
   const ym=`${_ad.getFullYear()}-${String(_ad.getMonth()+1).padStart(2,'0')}`;
@@ -881,7 +853,7 @@ function renderAlerts(){
   if(alerts.length){
     panel.classList.add('show');badge.classList.add('show');
     g('alertCount').textContent=alerts.length;
-    g('alertList').innerHTML=alerts.map(a=>`<div class="alertItem">⚠ <b>${escapeHTML(a.name)}</b> — ROI: <b>${fr2(a.roi)}</b> (threshold: ${fr2(a.thr)})</div>`).join('');
+    g('alertList').innerHTML=alerts.map(a=>`<div class="alertItem">* <b>${escapeHTML(a.name)}</b>  ROI: <b>${fr2(a.roi)}</b> (threshold: ${fr2(a.thr)})</div>`).join('');
   } else {
     panel.classList.remove('show');badge.classList.remove('show');
   }
@@ -889,9 +861,9 @@ function renderAlerts(){
 function scrollToAlerts(){g('alertPanel').scrollIntoView({behavior:'smooth'});}
 
 
-/* ═══════════════════════════════════════════════
+/* 
    GAME ANALYSIS
-═══════════════════════════════════════════════ */
+ */
 let gamePlatFilter = ''; // '' = all platforms
 
 function setGamePlatform(plat, btnEl) {
@@ -900,7 +872,7 @@ function setGamePlatform(plat, btnEl) {
   btnEl.classList.add('active');
   // Update label
   const lbl = g('gameBarPlatLbl');
-  if(lbl) lbl.textContent = plat ? '● ' + plat : '';
+  if(lbl) lbl.textContent = plat ? '. ' + plat : '';
   renderGameBar();
   renderROIRanking();
 }
@@ -962,7 +934,7 @@ function renderGameBar(){
     const subMax=Math.max(...rest.map(gm=>Math.abs(gm.rev)),1);
     const subRows=rest.map(gm=>gbarRow(gm.game, tagFor(gm), gm.rev, gm.pro, subMax, 1)).join('');
     html+=`<div class="gbar-sub" style="display:${legacyExpanded?'block':'none'}">${subRows}</div>`;
-    html+=`<button class="gbar-expand" data-action="toggleLegacy">${legacyExpanded?'▴ Collapse':'▾ Expand'} Legacy Portfolio (${rest.length} titles)</button>`;
+    html+=`<button class="gbar-expand" data-action="toggleLegacy">${legacyExpanded?'^ Collapse':'v Expand'} Legacy Portfolio (${rest.length} titles)</button>`;
   }
 
   g('gameBarList').innerHTML = html || '<div style="text-align:center;color:var(--t3);padding:30px;font-size:12px">No data</div>';
@@ -1030,7 +1002,7 @@ function renderROIRanking(){
   if(btn){
     if(legacyGames.length){
       btn.style.display='block';
-      btn.textContent=`${roiRankExpanded?'▴ Collapse':'▾ Expand'} Legacy Portfolio (${legacyGames.length} titles)`;
+      btn.textContent=`${roiRankExpanded?'^ Collapse':'v Expand'} Legacy Portfolio (${legacyGames.length} titles)`;
     } else {
       btn.style.display='none';
     }
@@ -1094,9 +1066,9 @@ function renderGameTrend(){
 }
 
 
-/* ═══════════════════════════════════════════════
+/* 
    DAILY SUMMARY TABLE
-═══════════════════════════════════════════════ */
+ */
 function renderDailySummary(){
   // Find last available date in filtered data
   const dates = [...new Set(filteredData.map(r=>r.date))].filter(Boolean).sort();
@@ -1159,9 +1131,9 @@ function renderDailySummary(){
       <td style="text-align:right"><span class="pill ${totRoi>=(TARGETS.roiAlert||1.20)?'pillG':'pillR'}" style="font-size:11px;font-weight:700">${fr2(totRoi)}</span></td>
     </tr>`;
 }
-/* ═══════════════════════════════════════════════
+/* 
    EXPORT
-═══════════════════════════════════════════════ */
+ */
 function exportCSV(){
   const h=['Date','Game','Platform','Revenue','Spend','Profit','ROI'];
   const csvCell = value => `"${String(value ?? '').replace(/"/g,'""')}"`;
@@ -1179,7 +1151,7 @@ function exportPDF(){
   const yr=TARGETS.year||CY;
   doc.setFontSize(18);doc.setFont('helvetica','bold');doc.text('Executive Dashboard Report',14,16);
   doc.setFontSize(9);doc.setTextColor(120);doc.setFont('helvetica','normal');
-  doc.text(`Year: ${yr}  |  Generated: ${new Date().toLocaleString()}  |  Period: ${dateFrom} → ${dateTo}`,14,23);
+  doc.text(`Year: ${yr}  |  Generated: ${new Date().toLocaleString()}  |  Period: ${dateFrom} -> ${dateTo}`,14,23);
   const c=aggData(filteredData),roi=c.spd>0?+(c.rev/c.spd).toFixed(2):0;
   doc.setTextColor(0);doc.setFontSize(10);
   doc.text(`Revenue: ${fm(c.rev)}   Spend: ${fm(c.spd)}   Profit: ${fm(c.pro)}   ROI: ${fr2(roi)}`,14,30);

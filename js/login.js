@@ -1,7 +1,7 @@
-/* ══════════════════════════════════════════════════
+/* 
    LOGIN / LOGOUT
-══════════════════════════════════════════════════ */
-// ── Login button loading state ──
+ */
+// -- Login button loading state --
 function setLoginLoading(loading) {
   const btn = document.querySelector('.loginBtn');
   if(!btn) return;
@@ -30,7 +30,7 @@ async function doLogin() {
     return;
   }
 
-  // ── Local lockout check (rate limiting) ──
+  // -- Local lockout check (rate limiting) --
   const att = getAttempts(emailRaw);
   if(att.until > Date.now()) {
     const mins = Math.ceil((att.until - Date.now()) / 60000);
@@ -44,10 +44,10 @@ async function doLogin() {
   errEl.style.display = 'none';
 
   try {
-    // ── Hash password before sending ──
+    // -- Hash password before sending --
     const hashed = await hashPwd(pwd);
 
-    // ── Verify with Apps Script (no key — login is server rate-limited) ──
+    // -- Verify with Apps Script (no key - login is server rate-limited) --
     const resp = await apiFetch({
       action: 'login',
       email:  emailRaw,
@@ -102,7 +102,7 @@ async function doLogin() {
       return;
     }
 
-    // ── SUCCESS ──
+    // -- SUCCESS --
     clearAttempts(emailRaw);
     const user  = resp.user;
     const token = resp.token;
@@ -139,20 +139,20 @@ function showFileProtocolWarning() {
   div.id = 'fileProtoWarning';
   div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
   div.innerHTML = `<div style="background:#0d1f35;border:1px solid #1e3a5f;border-radius:12px;padding:28px;max-width:480px;width:100%">
-    <div style="font-size:20px;font-weight:700;color:#00e5c3;margin-bottom:6px">⚠️ Server Not Running</div>
-    <div style="font-size:13px;color:#7a8fad;margin-bottom:18px">This file is opened via the <code style="color:#ffb800">file://</code> protocol — due to browser security it cannot connect to the login server.</div>
+    <div style="font-size:20px;font-weight:700;color:#00e5c3;margin-bottom:6px"> Server Not Running</div>
+    <div style="font-size:13px;color:#7a8fad;margin-bottom:18px">This file is opened via the <code style="color:#ffb800">file://</code> protocol - due to browser security it cannot connect to the login server.</div>
     <div style="font-size:13px;font-weight:600;color:#b0c4de;margin-bottom:10px">What to do:</div>
     <div style="background:#0a1628;border-radius:8px;padding:14px;font-size:12px;color:#7a8fad;line-height:1.8">
-      <b style="color:#00e5c3">Option 1 — VS Code Live Server (Easiest):</b><br>
+      <b style="color:#00e5c3">Option 1 - VS Code Live Server (Easiest):</b><br>
       1. Open the file in VS Code<br>
       2. Click "Go Live" at the bottom<br>
       3. It will open at <code style="color:#ffb800">http://127.0.0.1:5500</code><br><br>
-      <b style="color:#00e5c3">Option 2 — Python:</b><br>
+      <b style="color:#00e5c3">Option 2 - Python:</b><br>
       In the terminal, go to the file's folder:<br>
       <code style="color:#ffb800">python -m http.server 8080</code><br>
       Then open: <code style="color:#ffb800">http://localhost:8080</code><br><br>
-      <b style="color:#00e5c3">Option 3 — Netlify Drop:</b><br>
-      Drag the file onto <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer" style="color:#4d9fff">app.netlify.com/drop</a> — free hosting
+      <b style="color:#00e5c3">Option 3 - Netlify Drop:</b><br>
+      Drag the file onto <a href="https://app.netlify.com/drop" target="_blank" rel="noopener noreferrer" style="color:#4d9fff">app.netlify.com/drop</a> - free hosting
     </div>
     <button data-close-file-warning
       style="margin-top:16px;width:100%;padding:10px;background:#00e5c3;color:#020d1a;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px">
@@ -168,7 +168,7 @@ function loginSuccess(user) {
   g('rolePill').textContent = user.role.toUpperCase();
   g('rolePill').className = 'rolePill ' + (user.role==='admin'?'rAdmin':'rViewer');
   g('unameEl').textContent = user.name || user.email.split('@')[0];
-  // Targets tab + user management are admin-only — viewers never see them.
+  // Targets tab + user management are admin-only - viewers never see them.
   const _isAdmin = user.role==='admin';
   if(_isAdmin) g('userMgmtBtn').style.display='flex';
   g('targetsTabBtn').style.display = _isAdmin ? 'inline-block' : 'none';
@@ -184,11 +184,11 @@ function loginSuccess(user) {
   loadData();
 }
 
-// ── Check existing session on page load ──
+// -- Check existing session on page load --
 function checkSession() {
   const session = getSession();
   if(!session) return false;
-  // Restore from stored session — no server call needed (token in sessionStorage)
+  // Restore from stored session - no server call needed (token in sessionStorage)
   CU = { u: session.email, name: session.name, r: session.role };
   loginSuccess({ email: session.email, name: session.name, role: session.role });
   return true;

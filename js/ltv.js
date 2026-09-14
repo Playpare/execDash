@@ -1,10 +1,10 @@
-/* ═══════════════════════════════════════════════
+/* -----------------------------------------------
    LTV TAB
-   ─ Data lives in a different spreadsheet, exposed via
+   - Data lives in a different spreadsheet, exposed via
      same Apps Script as ?action=ltv (so auth + URL reuse).
-   ─ Each cohort row has 3 LTV types (Ad / IAP / Total).
-   ─ Default chart/table = D0..D30. Toggle reveals D40/D45/D50.
-═══════════════════════════════════════════════ */
+   - Each cohort row has 3 LTV types (Ad / IAP / Total).
+   - Default chart/table = D0..D30. Toggle reveals D40/D45/D50.
+----------------------------------------------- */
 const LTV_DAYS_STD = ['D0','D1','D3','D7','D14','D21','D28','D30'];
 const LTV_DAYS_EXT = ['D0','D1','D3','D7','D14','D21','D28','D30','D40','D45','D50'];
 // Days that the cumulative-curves chart starts with (other days are
@@ -62,7 +62,7 @@ async function buildLtvUI(){
 // is stale. Bypasses the _ltvLoaded gate, then re-renders.
 async function reloadLtvData(btn){
   const orig = btn ? btn.textContent : '';
-  if(btn){ btn.disabled = true; btn.textContent = '⏳ Refreshing...'; }
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ Refreshing…'; }
   try {
     await loadLtvData();
     populateLtvDropdowns();
@@ -103,7 +103,7 @@ async function loadLtvData(){
     });
   } catch(e){
     ltvData = [];
-    toast('LTV fetch failed — ' + e.message, 'warn');
+    toast('LTV fetch failed - ' + e.message, 'warn');
   }
 }
 
@@ -448,9 +448,9 @@ function renderLtvKpis(rows){
     const fdays = (ltvFilters.range === 'extended' ? LTV_DAYS_EXT : LTV_DAYS_STD);
     const fc = ltvForecastFor(rows, fdays, ltvForecastTarget);
     if(fc && fc.targetVal != null){
-      const methodLbl = fc.method === 'scaling' ? `scaling • ${fc.cohorts} cohorts` : 'curve-fit';
+      const methodLbl = fc.method === 'scaling' ? `scaling . ${fc.cohorts} cohorts` : 'curve-fit';
       fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, fmtUSD(fc.targetVal),
-        `<span class="ltvGrowth up">est.</span> from ${fc.anchor} • ${methodLbl}`);
+        `<span class="ltvGrowth up">est.</span> from ${fc.anchor} . ${methodLbl}`);
     } else {
       fcTile = kpiTile('lkFc', `Forecast ${ltvForecastTarget} LTV`, '-', 'not enough data');
     }
@@ -555,7 +555,7 @@ function renderLtvForecastChart(rows){
   const fcNote = g('ltvFcNote');
   if(charts.ltvFc){ charts.ltvFc.destroy(); charts.ltvFc = null; }
   if(!ltvForecastOn){
-    if(fcNote) fcNote.textContent = 'Forecast off — turn On to project.';
+    if(fcNote) fcNote.textContent = 'Forecast off - turn On to project.';
     const cx=canvas.getContext('2d'); cx.clearRect(0,0,canvas.width,canvas.height);
     return;
   }
@@ -587,7 +587,7 @@ function renderLtvForecastChart(rows){
     ]},
     options: ltvFcChartOpts()
   });
-  if(fcNote) fcNote.textContent = `Est. ${ltvForecastTarget} ${type.replace(' LTV','')}: $${fc.targetVal.toFixed(2)} • ${fc.method==='scaling'?('historical scaling • '+fc.cohorts+' cohorts'):'curve-fit'} from ${fc.anchor}`;
+  if(fcNote) fcNote.textContent = `Est. ${ltvForecastTarget} ${type.replace(' LTV','')}: $${fc.targetVal.toFixed(2)} . ${fc.method==='scaling'?('historical scaling . '+fc.cohorts+' cohorts'):'curve-fit'} from ${fc.anchor}`;
 }
 
 /* -- Performance Trends --
@@ -689,7 +689,7 @@ function renderLtvPerformance(comparisonRows){
         tooltip:{
           mode:'index', intersect:false,
           callbacks:{
-            title: items => `${ltvPerfDay} • ${items[0].label}`,
+            title: items => `${ltvPerfDay} . ${items[0].label}`,
             label: ctx  => ctx.parsed.y == null ? ` ${ctx.dataset.label}: -` : ` ${ctx.dataset.label}: $${ctx.parsed.y.toFixed(2)}`
           }
         }
@@ -787,7 +787,7 @@ function renderLtvHeatmap(rows){
 
     return `<tr>
       <td>${escapeHTML(r.installDate||'-')}</td>
-      <td${tip ? ' title="'+escapeAttr(tip)+'"' : ''}>${escapeHTML(gameLbl)} • ${escapeHTML(countryLbl)}</td>
+      <td${tip ? ' title="'+escapeAttr(tip)+'"' : ''}>${escapeHTML(gameLbl)} . ${escapeHTML(countryLbl)}</td>
       <td>${(r.cohortSize||0).toLocaleString()}</td>
       ${cells}
     </tr>`;
