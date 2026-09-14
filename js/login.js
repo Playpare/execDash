@@ -55,6 +55,29 @@ async function doLogin() {
     });
 
     if(resp.error) {
+      /* The server has its OWN rate limiter, separate from the local one, and
+         it answers a locked account with its own message:
+
+           email that exists, locked  -> "Too many attempts. Try again in 15 minutes."
+           email that does not exist  -> "Invalid credentials"
+
+         Every server error used to be reported as "Invalid email or password"
+         and counted as one more wrong password. So a locked account told the
+         user their password was wrong, they tried again, and each attempt fed
+         the lockout that was causing it. The password was never the problem
+         and the screen never said so.
+
+         A lockout is not a credential failure: show what the server said, and
+         do not count it. */
+      const serverMsg = String(resp.error);
+      if(/too many attempts|locked|rate limit/i.test(serverMsg)) {
+        errEl.textContent = '⛔ ' + serverMsg;
+        if(lockEl) lockEl.textContent = 'Locked by the server — wait before trying again';
+        errEl.style.display = 'block';
+        g('lPass').value = '';
+        return;
+      }
+
       // Record failed attempt locally
       const a = getAttempts(emailRaw);
       a.count = (a.count||0) + 1;
@@ -63,9 +86,14 @@ async function doLogin() {
         a.count = 0;
         errEl.textContent = `⛔ Account locked for ${LOCKOUT_MINUTES} minutes.`;
         if(lockEl) lockEl.textContent = `Too many failed attempts`;
-      } else {
+      } else if(/invalid credentials/i.test(serverMsg)) {
         const left = MAX_ATTEMPTS - a.count;
         errEl.textContent = `⚠ Invalid email or password. ${left} attempt(s) remaining.`;
+      } else {
+        /* Anything else - a disabled account, a sheet the server could not
+           read - is not a wrong password either. Saying so sent people to
+           check a password that was already correct. */
+        errEl.textContent = '⚠ ' + serverMsg;
       }
       setAttempts(emailRaw, a);
       errEl.style.display = 'block';
